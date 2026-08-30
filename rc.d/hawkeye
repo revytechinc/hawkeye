@@ -93,10 +93,10 @@ hawkeye_reload()
 }
 
 if [ "${hawkeye_mcp}" = "YES" ]; then
-	command_args="-P ${pidfile} -u ${hawkeye_user} -f /usr/bin/env HAWKEYE_MCP_TOKEN_FILE=${hawkeye_mcp_token_file} ${procname} --config ${hawkeye_config} mcp --http"
+	command_args="-p ${pidfile} -u ${hawkeye_user} -f /usr/bin/env HAWKEYE_MCP_TOKEN_FILE=${hawkeye_mcp_token_file} ${procname} --config ${hawkeye_config} mcp --http"
 else
 	# Long-running placeholder so SIGHUP reload remains available.
-	command_args="-P ${pidfile} -u ${hawkeye_user} -f /usr/bin/true"
+	command_args="-p ${pidfile} -u ${hawkeye_user} -f /usr/bin/true"
 fi
 
 run_rc_command "$1"
