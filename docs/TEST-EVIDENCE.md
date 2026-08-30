@@ -230,3 +230,21 @@ Re-run `mandoc -T lint man/hawkeye.8 man/hawkeye.conf.5` on FreeBSD/CloudBSD.
 - Tests use **FAKE** secret fixtures only (`internal/redact/testdata/fake_secrets.txt`).
 - Knowledge corpus is not vendored; Open consumes a temp SQLite FTS DB in tests.
 - No public chat UI is present.
+
+
+## 9. Public token-authenticated MCP (2026-08-30)
+
+`go test ./internal/... ./cmd/hawkeye -count=1` PASS.
+
+HTTP MCP:
+
+- missing token → 401 + `WWW-Authenticate: Bearer`
+- wrong fixture token → 401
+- fixture token → not 401 (GET 200 / POST initialize 200)
+- stdio MCP still works without a token
+- privileged MCP apply remains dry-run (`ActorMCP`)
+- JSON config names `HAWKEYE_MCP_TOKEN`; tests use fixture tokens only
+
+`--check-config` on `configs/config.example.json`: exit 0.
+
+TLS is optional on the loopback listener (nginx terminates TLS). Public bind is still rejected.

@@ -14,9 +14,10 @@ import (
 )
 
 type Listen struct {
-	MCPHTTP string `json:"mcp_http"`
-	TLSCert string `json:"tls_cert"`
-	TLSKey  string `json:"tls_key"`
+	MCPHTTP     string `json:"mcp_http"`
+	TLSCert     string `json:"tls_cert"`
+	TLSKey      string `json:"tls_key"`
+	MCPTokenEnv string `json:"mcp_token_env"`
 }
 
 type Knowledge struct {
@@ -65,7 +66,8 @@ func Default() Config {
 	return Config{
 		LogLevel: "INFO",
 		Listen: Listen{
-			MCPHTTP: "127.0.0.1:8741",
+			MCPHTTP:     "127.0.0.1:8741",
+			MCPTokenEnv: "HAWKEYE_MCP_TOKEN",
 		},
 		Knowledge: Knowledge{
 			Paths: []string{"/boot/hawkeye", "/usr/local/share/hawkeye"},
@@ -107,6 +109,22 @@ func Validate(c Config) error {
 		ip := net.ParseIP(host)
 		if ip == nil || !ip.IsLoopback() {
 			return fmt.Errorf("listen.mcp_http must bind loopback (127.0.0.1 or ::1), got %q", c.Listen.MCPHTTP)
+		}
+	}
+	envName := strings.TrimSpace(c.Listen.MCPTokenEnv)
+	if envName == "" {
+		return fmt.Errorf("listen.mcp_token_env is required (environment variable name, not the secret)")
+	}
+	if len(envName) > 64 {
+		return fmt.Errorf("listen.mcp_token_env must be an environment variable name")
+	}
+	for i, r := range envName {
+		ok := (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_'
+		if i == 0 && !(r >= 'A' && r <= 'Z') {
+			ok = false
+		}
+		if !ok {
+			return fmt.Errorf("listen.mcp_token_env must be an environment variable name, not a secret")
 		}
 	}
 	if strings.TrimSpace(c.PidFile) == "" {

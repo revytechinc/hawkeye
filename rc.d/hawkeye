@@ -4,13 +4,14 @@
 # REQUIRE: FILESYSTEMS
 # KEYWORD: shutdown
 
-# Optional rc.d service: refresh hawkeye-data artifacts and optionally
-# run a localhost MCP listener. This is NOT a public chat UI.
+# Optional rc.d service: refresh hawkeye-data artifacts and run a
+# loopback MCP listener (nginx terminates TLS; hawkeye checks the token).
+# This is NOT a public chat UI.
 
 . /etc/rc.subr
 
 name="hawkeye"
-desc="Hawkeye knowledge updater and optional localhost MCP"
+desc="Hawkeye knowledge updater and token-authenticated MCP"
 rcvar="hawkeye_enable"
 
 load_rc_config ${name}
@@ -21,6 +22,7 @@ load_rc_config ${name}
 : ${hawkeye_user:="root"}
 : ${hawkeye_pidfile:="/var/run/hawkeye.pid"}
 : ${hawkeye_config:="/usr/local/etc/cloudbsd/hawkeye/config.json"}
+: ${hawkeye_mcp_token_file:="/usr/local/etc/cloudbsd/hawkeye/mcp.token"}
 
 pidfile="${hawkeye_pidfile}"
 procname="/usr/local/bin/hawkeye"
@@ -55,8 +57,22 @@ hawkeye_prestart()
 	if [ "${hawkeye_update}" = "YES" ]; then
 		hawkeye_update || warn "hawkeye update failed (continuing)"
 	fi
-	if [ "${hawkeye_mcp}" != "YES" ]; then
-		warn "hawkeye_mcp is NO; enable it to run the localhost MCP listener"
+	if [ "${hawkeye_mcp}" = "YES" ]; then
+		if [ ! -r "${hawkeye_mcp_token_file}" ]; then
+			err 1 "hawkeye: MCP token file missing"
+		fi
+		_mode=$(stat -f %OLp "${hawkeye_mcp_token_file}" 2>/dev/null || echo "")
+		case "${_mode}" in
+		600|400) ;;
+		*)
+			err 1 "hawkeye: MCP token file must be mode 0600"
+			;;
+		esac
+		# Point at the file; do not cat the token into this script or logs.
+		HAWKEYE_MCP_TOKEN_FILE="${hawkeye_mcp_token_file}"
+		export HAWKEYE_MCP_TOKEN_FILE
+	else
+		warn "hawkeye_mcp is NO; enable it to run the MCP listener"
 	fi
 }
 

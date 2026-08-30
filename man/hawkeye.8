@@ -50,11 +50,22 @@ Exits non-zero if unhealthy.
 .It Nm mcp Op Fl -stdio | Fl -http
 MCP server.
 .Fl -stdio
-is the default.
+is the default and does not require a token.
 .Fl -http
-is Streamable HTTP over TLS bound to loopback
+is Streamable HTTP bound to loopback
 .Pq 127.0.0.1
 by default.
+HTTP requires a bearer token from
+.Ev HAWKEYE_MCP_TOKEN
+or the environment variable named by
+.Va listen.mcp_token_env .
+nginx terminates TLS and reverse-proxies
+.Pa /mcp
+to the loopback listener.
+Public URL:
+.Lk https://hawkeye.revytechinc.com/mcp .
+Missing or wrong token returns HTTP 401.
+The token is never written to logs or documentation.
 MCP tools use the same plan/apply gate.
 .It Nm update
 Refresh knowledge artifacts from

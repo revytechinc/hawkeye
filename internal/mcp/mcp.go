@@ -4,17 +4,22 @@
 package mcp
 
 import (
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/revytechinc/hawkeye/internal/apply"
 	"github.com/revytechinc/hawkeye/internal/redact"
 )
+
+const DefaultTokenEnv = "HAWKEYE_MCP_TOKEN"
+const TokenFileEnv = "HAWKEYE_MCP_TOKEN_FILE"
 
 type Request struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -49,6 +54,7 @@ type Handlers struct {
 
 type Server struct {
 	Handlers Handlers
+	Token    string
 }
 
 func New(h Handlers) *Server { return &Server{Handlers: h} }
@@ -163,48 +169,107 @@ func ServeStdio(r io.Reader, w io.Writer, s *Server) error {
 	}
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+func bearerToken(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if len(h) < len(prefix) {
+		return ""
 	}
-	var req Request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	if !strings.EqualFold(h[:len(prefix)], prefix) {
+		return ""
 	}
-	resp := s.Handle(req)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(resp)
+	return strings.TrimSpace(h[len(prefix):])
 }
 
-func ListenAndServeTLS(addr, certFile, keyFile string, s *Server) error {
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return err
+func tokenOK(got, want string) bool {
+	if want == "" {
+		return false
 	}
-	ip := net.ParseIP(host)
-	if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+	gb := []byte(got)
+	wb := []byte(want)
+	if len(gb) != len(wb) {
+		_ = subtle.ConstantTimeCompare(wb, wb)
+		return false
+	}
+	return subtle.ConstantTimeCompare(gb, wb) == 1
+}
+
+func unauthorized(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", `Bearer realm="hawkeye"`)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	_, _ = w.Write([]byte(`{"error":"unauthorized"}` + "\n"))
+}
+
+func (s *Server) authorized(r *http.Request) bool {
+	return tokenOK(bearerToken(r), s.Token)
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !s.authorized(r) {
+		unauthorized(w)
+		return
+	}
+	switch r.Method {
+	case http.MethodPost:
+		var req Request
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		resp := s.Handle(req)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("MCP-Protocol-Version", "2025-03-26")
+		_ = json.NewEncoder(w).Encode(resp)
+	case http.MethodGet, http.MethodHead:
+		// Streamable HTTP GET/HEAD after auth: liveness, not an anonymous probe.
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("MCP-Protocol-Version", "2025-03-26")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		if r.Method != http.MethodHead {
+			_, _ = w.Write([]byte(`{"ok":true}` + "\n"))
+		}
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func ListenAndServe(addr, certFile, keyFile, token string, s *Server) error {
+	if !BindIsLoopback(addr) {
 		return fmt.Errorf("MCP HTTP must bind loopback, got %q", addr)
 	}
-	if certFile == "" || keyFile == "" {
-		return fmt.Errorf("MCP Streamable HTTP requires TLS cert and key")
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("MCP HTTP requires a bearer token from env")
 	}
+	s.Token = token
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		_ = ln.Close()
-		return err
+	if certFile != "" || keyFile != "" {
+		if certFile == "" || keyFile == "" {
+			_ = ln.Close()
+			return fmt.Errorf("MCP TLS requires both tls_cert and tls_key")
+		}
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			_ = ln.Close()
+			return err
+		}
+		ln = tls.NewListener(ln, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
 	}
-	tlsLn := tls.NewListener(ln, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", s)
+	mux.Handle("/mcp/", s)
 	mux.Handle("/", s)
 	srv := &http.Server{Addr: addr, Handler: mux}
-	return srv.Serve(tlsLn)
+	return srv.Serve(ln)
+}
+
+func ListenAndServeTLS(addr, certFile, keyFile string, s *Server) error {
+	return ListenAndServe(addr, certFile, keyFile, s.Token, s)
 }
 
 func DefaultAddr() string { return "127.0.0.1:8741" }
@@ -229,4 +294,39 @@ func ToolsUseApplyGate() bool { return true }
 
 func NormalizeBind(addr string) string {
 	return strings.TrimSpace(addr)
+}
+
+func ResolveToken(getenv func(string) string, envName string) (string, error) {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	if strings.TrimSpace(envName) == "" {
+		envName = DefaultTokenEnv
+	}
+	if t := strings.TrimSpace(getenv(envName)); t != "" {
+		return t, nil
+	}
+	if p := strings.TrimSpace(getenv(TokenFileEnv)); p != "" {
+		return ReadTokenFile(p)
+	}
+	return "", fmt.Errorf("MCP HTTP requires %s or %s", envName, TokenFileEnv)
+}
+
+func ReadTokenFile(path string) (string, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("MCP token file: %w", err)
+	}
+	if fi.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("MCP token file must be mode 0600")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("MCP token file: %w", err)
+	}
+	t := strings.TrimSpace(string(b))
+	if t == "" {
+		return "", fmt.Errorf("MCP token file is empty")
+	}
+	return t, nil
 }

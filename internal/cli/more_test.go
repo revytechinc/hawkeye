@@ -54,7 +54,7 @@ func TestInitStdoutAndVersionCmd(t *testing.T) {
 	}
 }
 
-func TestMCPHTTPRequiresTLS(t *testing.T) {
+func TestMCPHTTPRequiresToken(t *testing.T) {
 	dir := t.TempDir()
 	b, _ := config.InitJSON()
 	cp := filepath.Join(dir, "config.json")
@@ -63,10 +63,13 @@ func TestMCPHTTPRequiresTLS(t *testing.T) {
 	}
 	code, _, err := run(t, []string{"--config", cp, "mcp", "--http"}, "", fakeHost{usr: true, varp: true}, nil)
 	if code == 0 {
-		t.Fatal("expected tls required")
+		t.Fatal("expected token required")
 	}
-	if !strings.Contains(err, "TLS") && !strings.Contains(strings.ToLower(err), "tls") {
+	if !strings.Contains(strings.ToLower(err), "token") {
 		t.Fatal(err)
+	}
+	if strings.Contains(err, "test-mcp-token-fixture-not-production") {
+		t.Fatal("stderr leaked fixture token")
 	}
 }
 

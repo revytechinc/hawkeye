@@ -84,7 +84,7 @@ Also: `docs/ARCHITECTURE.md`, `docs/TEST-EVIDENCE.md`, `man/hawkeye.8`, `man/haw
 ## Primary directives
 
 ### 1. Security first
-Redact before LLM/MCP. Apply dry-run default. Operator CLI is the only privileged mutator. MCP HTTP binds `127.0.0.1` and requires TLS. No public UI.
+Redact before LLM/MCP. Apply dry-run default. Operator CLI is the only privileged mutator. MCP HTTP binds `127.0.0.1` and requires a bearer token (nginx TLS). No public UI.
 
 ### 2. Modular architecture
 `cmd/hawkeye` is thin. Domain lives in `internal/*`. Knowledge client consumes hawkeye-data; it does not embed the corpus.
@@ -130,7 +130,7 @@ Rebase onto the branch, keep tests green, do not force-push `main`.
 | Knowledge | SQLite FTS client, not vendored | Corpus is hawkeye-data |
 | Apply | Default dry-run | Privileged mutation needs an operator |
 | LLM | Interface, llama.cpp hunch, GPU then CPU | Missing GPU must not block CPU jobs |
-| MCP | stdio + Streamable HTTP/TLS on 127.0.0.1 | Operator tool, not a public API |
+| MCP | stdio + Streamable HTTP on 127.0.0.1 with bearer token; nginx TLS | Public URL, no anonymous access |
 | Config | JSON RFC 8259 | CloudBSD law |
 | License | BSD 3-Clause, REVYTECH, Inc. | CloudBSD law |
 

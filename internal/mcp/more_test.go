@@ -47,13 +47,14 @@ func TestHandle_ToolsWithHandlers(t *testing.T) {
 
 func TestServeHTTP_MethodNotAllowedAndBadJSON(t *testing.T) {
 	s := mcp.New(mcp.Handlers{})
+	s.Token = fixtureToken
 	w := httptest.NewRecorder()
-	s.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/mcp", nil))
+	s.ServeHTTP(w, authed(httptest.NewRequest(http.MethodPut, "/mcp", nil)))
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatal(w.Code)
 	}
 	w = httptest.NewRecorder()
-	s.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString("{")))
+	s.ServeHTTP(w, authed(httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString("{"))))
 	if w.Code == 200 {
 		t.Fatal("bad json")
 	}

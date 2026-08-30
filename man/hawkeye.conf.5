@@ -41,7 +41,15 @@ Must be loopback.
 Default
 .Li 127.0.0.1:8741 .
 .It Va listen.tls_cert , Va listen.tls_key
-PEM paths required for MCP HTTP.
+Optional PEM paths if Hawkeye itself terminates TLS.
+When empty, the loopback listener is plain HTTP and nginx
+.Pq or another reverse proxy
+provides TLS.
+.It Va listen.mcp_token_env
+Name of the environment variable that holds the MCP HTTP bearer token.
+Default
+.Ev HAWKEYE_MCP_TOKEN .
+The token itself is never stored in JSON.
 .It Va knowledge.paths
 Ordered search paths for
 .Pa knowledge.sqlite .
@@ -97,6 +105,20 @@ Override config path.
 .It Ev HAWKEYE_LLM_API_KEY
 Remote LLM API key
 .Pq never placed in the JSON file .
+.It Ev HAWKEYE_MCP_TOKEN
+Bearer token for Streamable HTTP MCP.
+Required for
+.Nm hawkeye Cm mcp Fl -http .
+Not required for stdio.
+Never place the token in JSON, man pages, or the README.
+.It Ev HAWKEYE_MCP_TOKEN_FILE
+Optional path to a mode
+.Li 0600
+file containing the token
+.Pq trailing newline stripped .
+Used when
+.Ev HAWKEYE_MCP_TOKEN
+is unset.
 .It Ev HAWKEYE_KNOWLEDGE_PATH
 Extra knowledge directory for tests and rescue overlays.
 .It Ev HAWKEYE_DATA_ARTIFACT

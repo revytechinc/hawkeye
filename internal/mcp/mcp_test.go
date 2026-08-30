@@ -27,13 +27,13 @@ func TestBindIsLoopback(t *testing.T) {
 	}
 }
 
-func TestListenAndServeTLS_RejectsPublicAndMissingTLS(t *testing.T) {
+func TestListenAndServeTLS_RejectsPublicAndMissingToken(t *testing.T) {
 	s := mcp.New(mcp.Handlers{})
 	if err := mcp.ListenAndServeTLS("0.0.0.0:1", "c", "k", s); err == nil {
 		t.Fatal("public bind")
 	}
 	if err := mcp.ListenAndServeTLS("127.0.0.1:1", "", "", s); err == nil {
-		t.Fatal("tls required")
+		t.Fatal("token required")
 	}
 }
 
@@ -93,9 +93,10 @@ func TestServeHTTP_StreamableJSON(t *testing.T) {
 	s := mcp.New(mcp.Handlers{
 		Doctor: func() (any, error) { return map[string]any{"healthy": true}, nil },
 	})
+	s.Token = fixtureToken
 	params, _ := json.Marshal(map[string]any{"name": "doctor", "arguments": map[string]any{}})
 	body, _ := json.Marshal(mcp.Request{JSONRPC: "2.0", ID: 3, Method: "tools/call", Params: params})
-	r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+	r := authed(httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body)))
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, r)
 	if w.Code != 200 {
