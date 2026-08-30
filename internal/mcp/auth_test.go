@@ -144,3 +144,34 @@ func TestDefaultTokenEnv(t *testing.T) {
 		t.Fatal(mcp.DefaultTokenEnv)
 	}
 }
+
+func TestServeHTTP_GET_SSE(t *testing.T) {
+	s := mcp.New(mcp.Handlers{})
+	s.Token = fixtureToken
+	r := authed(httptest.NewRequest(http.MethodGet, "/mcp", nil))
+	r.Header.Set("Accept", "text/event-stream")
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Header().Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("content-type %q", w.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(w.Body.String(), "event:") || !strings.Contains(w.Body.String(), "/mcp") {
+		t.Fatal(w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), fixtureToken) {
+		t.Fatal("sse leaked token")
+	}
+}
+
+func TestServeHTTP_GET_MissingTokenIs401(t *testing.T) {
+	s := mcp.New(mcp.Handlers{})
+	s.Token = fixtureToken
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/mcp", nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("GET missing token: got %d", w.Code)
+	}
+}
