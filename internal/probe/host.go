@@ -4,24 +4,29 @@
 package probe
 
 import (
-	"golang.org/x/sys/unix"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 // DefaultHost inspects the live machine. Tests inject Host fakes instead.
 type DefaultHost struct {
-	ReadFile func(string) ([]byte, error)
-	Stat     func(string) (os.FileInfo, error)
-	Glob     func(string) ([]string, error)
+	ReadFile   func(string) ([]byte, error)
+	Stat       func(string) (os.FileInfo, error)
+	Glob       func(string) ([]string, error)
+	MountTable func() (string, error) // mount -p / getfsstat text; tests inject this
+	Sysctl     func(string) (int, bool)
 }
 
 func Live() DefaultHost {
 	return DefaultHost{
-		ReadFile: os.ReadFile,
-		Stat:     os.Stat,
-		Glob:     filepath.Glob,
+		ReadFile:   os.ReadFile,
+		Stat:       os.Stat,
+		Glob:       filepath.Glob,
+		MountTable: liveMountTable,
+		Sysctl:     liveSysctlInt,
 	}
 }
 
@@ -37,9 +42,10 @@ func (h DefaultHost) read(path string) string {
 }
 
 func (h DefaultHost) SysctlInt(name string) (int, bool) {
-	// File-based only so consult never shells out. CLI may overlay values.
-	_ = name
-	return 0, false
+	if h.Sysctl != nil {
+		return h.Sysctl(name)
+	}
+	return liveSysctlInt(name)
 }
 
 func (h DefaultHost) PathExists(path string) bool {
@@ -65,23 +71,18 @@ func (h DefaultHost) MountReadOnly(path string) bool {
 	if data == "" {
 		data = h.read("/etc/mtab")
 	}
-	if data == "" {
-		return !h.PathWritable(path)
-	}
-	for _, line := range strings.Split(data, "\n") {
-		f := strings.Fields(line)
-		if len(f) < 4 {
-			continue
-		}
-		if f[1] == path {
-			for _, o := range strings.Split(f[3], ",") {
-				if o == "ro" {
-					return true
-				}
-			}
+	if data == "" && h.MountTable != nil {
+		if b, err := h.MountTable(); err == nil {
+			data = b
 		}
 	}
-	return false
+	if data != "" {
+		if ro, found := MountPointReadOnly(data, path); found {
+			return ro
+		}
+	}
+	// Jail-safe: getfsstat/statfs. Never treat Access(W_OK) failure as mount RO.
+	return liveStatfsReadOnly(path)
 }
 
 func (h DefaultHost) NetworkCarrier() bool {
@@ -102,7 +103,8 @@ func (h DefaultHost) NetworkCarrier() bool {
 }
 
 func (h DefaultHost) GPUPresent() bool {
-	for _, p := range []string{"/dev/nvidia0", "/dev/dri/card0", "/dev/nvd0"} {
+	// nvd(4) is NVMe disk, not a GPU. nvme(4) likewise.
+	for _, p := range []string{"/dev/nvidia0", "/dev/dri/card0"} {
 		if h.PathExists(p) {
 			return true
 		}
