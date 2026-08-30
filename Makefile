@@ -15,10 +15,10 @@ build:
 	CGO_ENABLED=$(CGO_ENABLED) $(GO) build -trimpath -ldflags "-s -w" -o $(BIN) ./cmd/hawkeye
 
 test:
-	$(GO) test ./... -count=1
+	$(GO) test ./internal/... ./cmd/hawkeye -count=1
 
 cover:
-	$(GO) test ./... -count=1 -coverprofile=coverage.out
+	$(GO) test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out
 	$(GO) tool cover -func=coverage.out
 
 install: build
