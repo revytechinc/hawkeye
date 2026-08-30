@@ -199,13 +199,13 @@ Commands:
                       Mutate. DEFAULT is dry-run. LLM never execs as root.
   doctor              Service health (config, perms, pidfile, deps, headroom)
   mcp [--stdio|--http]
-                      MCP server (stdio default; HTTP is Streamable HTTP over TLS on 127.0.0.1)
+                      MCP server (stdio default; HTTP is Streamable HTTP on 127.0.0.1, bearer token required)
   update              Refresh knowledge from hawkeye-data artifacts when writable
   init                Write a sample JSON config
   version             Print version
 
 This repository ships binaries only. Knowledge lives in hawkeye-data.
-Never a public chat UI.
+Public MCP URL is https://hawkeye.revytechinc.com/mcp (token required). Not a public chat UI.
 `
 }
 
@@ -479,8 +479,14 @@ func cmdMCP(env Env, fs flagset, cfg config.Config) int {
 		if addr == "" {
 			addr = mcp.DefaultAddr()
 		}
-		fmt.Fprintf(env.Stderr, "hawkeye mcp: streamable HTTP on %s (TLS)\n", addr)
-		if err := mcp.ListenAndServeTLS(addr, cfg.Listen.TLSCert, cfg.Listen.TLSKey, s); err != nil {
+		token, err := mcp.ResolveToken(env.Getenv, cfg.Listen.MCPTokenEnv)
+		if err != nil {
+			fmt.Fprintln(env.Stderr, "hawkeye mcp:", err)
+			return 1
+		}
+		s.Token = token
+		fmt.Fprintf(env.Stderr, "hawkeye mcp: streamable HTTP on %s (loopback; bearer token required)\n", addr)
+		if err := mcp.ListenAndServe(addr, cfg.Listen.TLSCert, cfg.Listen.TLSKey, token, s); err != nil {
 			fmt.Fprintln(env.Stderr, err)
 			return 1
 		}

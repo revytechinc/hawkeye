@@ -14,7 +14,7 @@ chat UI.
 ```mermaid
 flowchart TD
     Operator["Operator CLI / stdio MCP"] -->|"consult / plan / apply / doctor"| CLI["Controller: cmd/hawkeye + internal/cli"]
-    MCPHTTP["MCP Streamable HTTP TLS on 127.0.0.1"] --> CLI
+    MCPHTTP["MCP Streamable HTTP on 127.0.0.1, bearer token; nginx TLS /mcp"] --> CLI
     CLI --> Probe["probe: tier 0/1/2"]
     CLI --> Knowledge["knowledge client: SQLite FTS RO"]
     CLI --> PlanApply["plan + apply gate"]
@@ -26,8 +26,10 @@ flowchart TD
 ```
 
 The UI, if any later, is a view only. This skeleton is operator CLI + MCP.
-Backends bind loopback. Payloads are application DTOs; provider protocols are
-never exposed. Secrets are redacted before any LLM or MCP payload.
+Backends bind loopback. Public MCP is nginx `/mcp` to that loopback listener;
+Hawkeye requires a bearer token (no anonymous access). Payloads are application
+DTOs; provider protocols are never exposed. Secrets are redacted before any LLM
+or MCP payload.
 
 ## Apply gate
 

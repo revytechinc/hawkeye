@@ -75,3 +75,24 @@ func TestResolvePath_UserConfig(t *testing.T) {
 		t.Fatalf("got %s want %s", got, p)
 	}
 }
+
+func TestValidate_MCPTokenEnv(t *testing.T) {
+	c := config.Default()
+	if c.Listen.MCPTokenEnv != "HAWKEYE_MCP_TOKEN" {
+		t.Fatal(c.Listen.MCPTokenEnv)
+	}
+	c.Listen.MCPTokenEnv = ""
+	if err := config.Validate(c); err == nil {
+		t.Fatal("empty token env")
+	}
+	c = config.Default()
+	c.Listen.MCPTokenEnv = "sk-this-looks-like-a-secret"
+	if err := config.Validate(c); err == nil {
+		t.Fatal("secret-shaped env name")
+	}
+	c = config.Default()
+	c.Listen.MCPTokenEnv = "HAWKEYE_MCP_TOKEN"
+	if err := config.Validate(c); err != nil {
+		t.Fatal(err)
+	}
+}

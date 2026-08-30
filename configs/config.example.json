@@ -3,7 +3,8 @@
   "listen": {
     "mcp_http": "127.0.0.1:8741",
     "tls_cert": "",
-    "tls_key": ""
+    "tls_key": "",
+    "mcp_token_env": "HAWKEYE_MCP_TOKEN"
   },
   "knowledge": {
     "paths": [

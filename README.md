@@ -3,7 +3,7 @@
 Meatball surgery on servers and desktops. Trench-warfare medicine for FreeBSD.
 
 Privileged CLI that can modify the system. Optional `rc.d` for knowledge-artifact
-updates and an optional localhost MCP listener.
+updates and a token-authenticated MCP listener (loopback; nginx TLS).
 
 ![Hawkeye Pierce, 1975 CBS still (public domain in the United States; restoration REVYTECH)](docs/images/hawkeye-pierce-hero.png)
 
@@ -15,6 +15,15 @@ corpus here.
 
 Hawkeye is **not** a public chat UI. It is **not** the revytechcommander doctor.
 
+Public Streamable HTTP MCP: `https://hawkeye.revytechinc.com/mcp`.
+A bearer token is required (`HAWKEYE_MCP_TOKEN` or `HAWKEYE_MCP_TOKEN_FILE`,
+mode `0600`). Missing or wrong token returns HTTP 401. Do not put a token in
+this README, man pages, or JSON config — JSON names the env var only.
+stdio MCP is for local use and does not require a token.
+nginx terminates TLS; Hawkeye still validates the bearer token.
+Apply/consult through MCP use the same dry-run / `--yes` gate; the LLM never
+execs as root.
+
 ## Commands
 
 | Command | What it does |
@@ -23,7 +32,7 @@ Hawkeye is **not** a public chat UI. It is **not** the revytechcommander doctor.
 | `hawkeye plan` | JSON plan. No mutation. |
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |
 | `hawkeye doctor` | Service health: config, perms, pidfile, deps, headroom. Human + JSON. Non-zero if unhealthy. |
-| `hawkeye mcp` | MCP server (stdio default; Streamable HTTP over TLS on `127.0.0.1`). |
+| `hawkeye mcp` | MCP server (stdio default; Streamable HTTP on `127.0.0.1`, bearer token required). |
 | `hawkeye update` | Refresh knowledge from hawkeye-data artifacts when writable. |
 | `hawkeye init` | Write sample JSON config (mode `0600`). |
 | `hawkeye --check-config` | Validate JSON config and exit. |
