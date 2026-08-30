@@ -55,7 +55,10 @@ make test
 Static /rescue-oriented build: `CGO_ENABLED=0 make build`.
 
 Configuration is JSON (RFC 8259) under `/usr/local/etc/cloudbsd/hawkeye/` or
-XDG. Secrets are environment variables (`HAWKEYE_LLM_API_KEY`). See
+XDG. Secrets are environment variables (`HAWKEYE_LLM_API_KEY`). Knowledge is
+`knowledge.sqlite` from hawkeye-data (FTS5 tables `documents_fts` and
+`playbooks_fts`, with fallback to legacy `knowledge_fts`). Override the search
+path with `HAWKEYE_KNOWLEDGE_PATH` (directory or sqlite file). See
 `hawkeye.conf(5)`.
 
 ## License

@@ -100,3 +100,23 @@ func TestProbe_ZFSReadOnlyCountsAsRootRO(t *testing.T) {
 		t.Fatalf("%+v", s)
 	}
 }
+
+func TestProbe_RWMountNotRootROWhenAccessFails(t *testing.T) {
+	h := fakeHost{
+		exists:   map[string]bool{"/usr": true, "/var": true, "/rescue": true},
+		writable: map[string]bool{"/": false},
+		ro:       map[string]bool{"/": false},
+		carrier:  true,
+		gpu:      false,
+	}
+	s := probe.Probe(h)
+	if s.RootRO {
+		t.Fatalf("rw mount must not be RootRO just because Access(/) failed: %+v", s)
+	}
+	if s.FirstSkill() == "unlock-rw" {
+		t.Fatal("first skill must not be unlock-rw on a writable mount")
+	}
+	if s.Tier == 0 {
+		t.Fatalf("rw root with /usr /var must not be forced to tier 0: %+v", s)
+	}
+}

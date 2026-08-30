@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
 
 	_ "modernc.org/sqlite"
 )
@@ -31,6 +33,9 @@ type Store struct {
 	ReadOnly  bool
 	FTS       bool
 	DB        *sql.DB
+	legacyFTS bool
+	docsFTS   bool
+	playFTS   bool
 }
 
 type Hit struct {
@@ -102,13 +107,20 @@ func Open(paths []string, rootRO bool) (*Store, error) {
 	return nil, fmt.Errorf("%w: %v", ErrNotFound, last)
 }
 
+func tableExists(db *sql.DB, name string) bool {
+	var got string
+	err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, name).Scan(&got)
+	return err == nil && got == name
+}
+
 func (s *Store) verifyFTS() error {
-	var name string
-	err := s.DB.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_fts'`).Scan(&name)
-	if err != nil {
-		return fmt.Errorf("fts table missing: %w", err)
+	s.legacyFTS = tableExists(s.DB, "knowledge_fts")
+	s.docsFTS = tableExists(s.DB, "documents_fts")
+	s.playFTS = tableExists(s.DB, "playbooks_fts")
+	if s.legacyFTS || s.docsFTS || s.playFTS {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("fts table missing: %w", sql.ErrNoRows)
 }
 
 func (s *Store) Close() error {
@@ -118,6 +130,39 @@ func (s *Store) Close() error {
 	return nil
 }
 
+// ftsMatchQuery turns a natural-language consult string into an FTS5 MATCH
+// expression. Hyphens are NOT operators in FTS5 ("read-only" => no such column).
+func ftsMatchQuery(q string) string {
+	var b strings.Builder
+	var tok []rune
+	flush := func() {
+		if len(tok) == 0 {
+			return
+		}
+		s := string(tok)
+		tok = tok[:0]
+		switch strings.ToUpper(s) {
+		case "AND", "OR", "NOT", "NEAR":
+			return
+		}
+		if b.Len() > 0 {
+			b.WriteString(" OR ")
+		}
+		b.WriteByte('"')
+		b.WriteString(s)
+		b.WriteByte('"')
+	}
+	for _, r := range q {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+			tok = append(tok, r)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return b.String()
+}
+
 func (s *Store) Search(query string, limit int) ([]Hit, error) {
 	if s == nil || s.DB == nil {
 		return nil, ErrNotFound
@@ -125,10 +170,36 @@ func (s *Store) Search(query string, limit int) ([]Hit, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-	rows, err := s.DB.Query(
-		`SELECT title, body, tags FROM knowledge_fts WHERE knowledge_fts MATCH ? LIMIT ?`,
-		query, limit,
-	)
+	match := ftsMatchQuery(query)
+	if match == "" {
+		match = strings.TrimSpace(query)
+	}
+	if match == "" {
+		return nil, nil
+	}
+	if s.legacyFTS {
+		return s.searchTable(`SELECT title, body, tags, 0 FROM knowledge_fts WHERE knowledge_fts MATCH ? LIMIT ?`, match, limit)
+	}
+	var parts []string
+	var args []any
+	if s.playFTS {
+		parts = append(parts, `SELECT title, body, when_to_use AS tags, bm25(playbooks_fts) AS rank, 0 AS pri FROM playbooks_fts WHERE playbooks_fts MATCH ?`)
+		args = append(args, match)
+	}
+	if s.docsFTS {
+		parts = append(parts, `SELECT title, body, category AS tags, bm25(documents_fts) AS rank, 1 AS pri FROM documents_fts WHERE documents_fts MATCH ?`)
+		args = append(args, match)
+	}
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("fts table missing")
+	}
+	q := `SELECT title, body, tags, rank FROM (` + strings.Join(parts, " UNION ALL ") + `) ORDER BY pri ASC, rank ASC LIMIT ?`
+	args = append(args, limit)
+	return s.searchTable(q, args...)
+}
+
+func (s *Store) searchTable(q string, args ...any) ([]Hit, error) {
+	rows, err := s.DB.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +207,7 @@ func (s *Store) Search(query string, limit int) ([]Hit, error) {
 	var hits []Hit
 	for rows.Next() {
 		var h Hit
-		if err := rows.Scan(&h.Title, &h.Body, &h.Tags); err != nil {
+		if err := rows.Scan(&h.Title, &h.Body, &h.Tags, &h.Rank); err != nil {
 			return nil, err
 		}
 		hits = append(hits, h)

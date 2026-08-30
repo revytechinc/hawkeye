@@ -40,8 +40,10 @@ func Probe(h Host) Snapshot {
 	s.RescuePresent = h.PathExists("/rescue")
 	s.NetworkUp = h.NetworkCarrier()
 	s.GPUPresent = h.GPUPresent()
+	// RootRO follows the mount table (ZFS/UFS ro), not unix.Access("/", W_OK).
+	// Unprivileged jail users cannot write / even when the dataset is rw.
 	s.ZFSReadOnly = h.MountReadOnly("/")
-	s.RootRO = s.ZFSReadOnly || h.MountReadOnly("/") || !h.PathWritable("/")
+	s.RootRO = s.ZFSReadOnly
 	switch {
 	case s.RootRO || !s.UsrPresent || !s.VarPresent:
 		s.Tier = 0
