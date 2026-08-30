@@ -222,13 +222,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("MCP-Protocol-Version", "2025-03-26")
 		_ = json.NewEncoder(w).Encode(resp)
 	case http.MethodGet, http.MethodHead:
-		// Streamable HTTP GET/HEAD after auth: liveness, not an anonymous probe.
-		w.Header().Set("Content-Type", "application/json")
+		// Streamable HTTP GET after auth opens an SSE stream (spec 2025-03-26).
+		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("MCP-Protocol-Version", "2025-03-26")
-		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Cache-Control", "no-cache, no-store")
+		w.Header().Set("Connection", "keep-alive")
 		w.WriteHeader(http.StatusOK)
 		if r.Method != http.MethodHead {
-			_, _ = w.Write([]byte(`{"ok":true}` + "\n"))
+			_, _ = io.WriteString(w, ": hawkeye mcp\n\n")
+			_, _ = io.WriteString(w, "event: endpoint\ndata: /mcp\n\n")
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
 		}
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
