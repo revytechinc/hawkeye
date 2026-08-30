@@ -1,8 +1,12 @@
 # Hawkeye
 
-FreeBSD diagnostic and operations doctor (MASH). Privileged CLI that can
-modify the system. Optional `rc.d` for knowledge-artifact updates and an
-optional localhost MCP listener.
+Meatball surgery on servers and desktops. Trench-warfare medicine for FreeBSD.
+
+Privileged CLI that can modify the system. Optional `rc.d` for knowledge-artifact
+updates and an optional localhost MCP listener.
+
+![Hawkeye Pierce, 1975 CBS still (public domain in the United States; restoration REVYTECH)](docs/images/hawkeye-pierce-hero.png)
+
 
 **This repository is binaries only.** Knowledge corpora live in
 [hawkeye-data](https://github.com/revytechinc/hawkeye-data). The website lives
