@@ -169,7 +169,9 @@ func InitJSON() ([]byte, error) {
 	return b, nil
 }
 
-func SystemDir() string { return "/usr/local/etc/cloudbsd/hawkeye" }
+var systemDir = "/usr/local/etc/cloudbsd/hawkeye"
+
+func SystemDir() string { return systemDir }
 
 func ExamplePath() string { return filepath.Join(SystemDir(), "config.json.sample") }
 
@@ -189,8 +191,8 @@ func ResolvePath(explicit string) string {
 		return explicit
 	}
 	candidates := []string{
-		filepath.Join(SystemDir(), "config.json"),
 		filepath.Join(UserDir(), "config.json"),
+		filepath.Join(SystemDir(), "config.json"),
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {

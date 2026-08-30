@@ -398,15 +398,19 @@ func cmdDoctor(env Env, fs flagset, cfg config.Config) int {
 	}
 	pidRunning := false
 	pidContent := ""
+	pidReadErr := ""
 	pidOK := true
 	if _, err := os.Stat(cfg.PidFile); err == nil {
 		pidRunning = true
 		b, err := os.ReadFile(cfg.PidFile)
-		if err == nil {
-			pidContent = string(b)
-		}
-		if _, err := pidfile.Read(cfg.PidFile); err != nil {
+		if err != nil {
+			pidReadErr = "pidfile is unreadable: " + err.Error()
 			pidOK = false
+		} else {
+			pidContent = string(b)
+			if _, err := pidfile.Read(cfg.PidFile); err != nil {
+				pidOK = false
+			}
 		}
 	}
 	mode := 0
@@ -421,6 +425,7 @@ func cmdDoctor(env Env, fs flagset, cfg config.Config) int {
 		Headroom:        hr,
 		PidRunning:      pidRunning,
 		PidContent:      pidContent,
+		PidReadErr:      pidReadErr,
 		PidOwnerOK:      pidOK,
 		ConfigMode:      mode,
 		KnowledgeOK:     ok,

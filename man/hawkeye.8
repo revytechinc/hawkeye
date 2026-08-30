@@ -82,9 +82,9 @@ Write a sample JSON configuration
 .It Fl -config Ar path
 JSON configuration file.
 Default search:
-.Pa /usr/local/etc/cloudbsd/hawkeye/config.json
-then
-.Pa $XDG_CONFIG_HOME/hawkeye/config.json .
+.Pa $XDG_CONFIG_HOME/hawkeye/config.json
+if present, else
+.Pa /usr/local/etc/cloudbsd/hawkeye/config.json .
 .It Fl -check-config
 Validate the configuration and exit.
 Must succeed before a SIGHUP reload.
@@ -133,7 +133,8 @@ System configuration.
 .It Pa /usr/local/etc/rc.d/hawkeye
 rc.d script.
 .It Pa /var/run/hawkeye.pid
-Pidfile.
+Pidfile
+.Pq mode 0644 ; the PID is not a secret .
 .It Pa /boot/hawkeye
 Rescue knowledge
 .Pq read-only .
