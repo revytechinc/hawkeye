@@ -248,3 +248,22 @@ HTTP MCP:
 `--check-config` on `configs/config.example.json`: exit 0.
 
 TLS is optional on the loopback listener (nginx terminates TLS). Public bind is still rejected.
+
+## 10. User config precedence and readable pidfile (2026-08-30)
+
+Jail `make test` failed on `TestResolvePath_UserConfig` because
+`/usr/local/etc/cloudbsd/hawkeye/config.json` exists and `ResolvePath`
+preferred it over `$XDG_CONFIG_HOME`. Doctor as a non-root operator
+reported `pidfile is empty` when `/var/run/hawkeye.pid` was mode 0600
+(unreadable).
+
+Fixes:
+
+- `ResolvePath`: user config wins when both exist; system is fallback
+- doctor reports `pidfile is unreadable` instead of `empty`
+- rc.d `start_postcmd` sets pidfile mode 0644 (PID is not a secret)
+
+`go test ./internal/... ./cmd/hawkeye -count=1` PASS on this branch.
+
+`mandoc -T lint` STYLE only (Os CloudBSD, Xr not installed in PATH).
+

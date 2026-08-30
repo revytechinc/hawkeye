@@ -5,6 +5,7 @@ package cli_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,3 +119,48 @@ func TestRunWrapper(t *testing.T) {
 		t.Fatal(code, errb.String())
 	}
 }
+
+func TestDoctorUnreadablePidfile(t *testing.T) {
+	dir := t.TempDir()
+	pidp := filepath.Join(dir, "hawkeye.pid")
+	if err := os.WriteFile(pidp, []byte("12345\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(pidp, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(pidp, 0o600) })
+	cfgp := filepath.Join(dir, "config.json")
+	b, err := config.InitJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Point pidfile at the unreadable file.
+	c, err := config.Parse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.PidFile = pidp
+	raw, err := jsonIndent(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfgp, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, _ := run(t, []string{"--config", cfgp, "doctor", "--json"}, "", fakeHost{usr: true, varp: true}, nil)
+	if code == 0 {
+		t.Fatal("expected unhealthy")
+	}
+	if strings.Contains(out, "pidfile is empty") {
+		t.Fatalf("unreadable reported as empty: %s", out)
+	}
+	if !strings.Contains(out, "unreadable") {
+		t.Fatalf("want unreadable: %s", out)
+	}
+}
+
+func jsonIndent(c config.Config) ([]byte, error) {
+	return json.MarshalIndent(c, "", "  ")
+}
+

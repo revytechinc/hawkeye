@@ -13,13 +13,14 @@ Secrets belong in environment variables, never in the file.
 Files that might hold secrets are mode
 .Li 0600 .
 .Pp
-System path:
-.Pa /usr/local/etc/cloudbsd/hawkeye/config.json
-.Pp
-Per-user path:
+Per-user path
+.Pq used first if the file exists :
 .Pa $XDG_CONFIG_HOME/hawkeye/config.json
 .Pq default
 .Pa ~/.config/hawkeye/config.json
+.Pp
+System path:
+.Pa /usr/local/etc/cloudbsd/hawkeye/config.json
 .Pp
 Generate a sample with
 .Nm hawkeye Cm init .
@@ -94,6 +95,9 @@ Doctor still reports GPU presence.
 .It Va pidfile
 Pidfile path.
 Must not be empty or negative.
+Created mode
+.Li 0644
+.Pq the PID is not a secret so doctor can read it without root .
 .It Va audit_log
 JSON-lines apply audit log.
 Mode 0600 when created.

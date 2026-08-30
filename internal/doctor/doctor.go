@@ -34,6 +34,7 @@ type Deps struct {
 	Headroom        headroom.Snapshot
 	PidRunning      bool
 	PidContent      string
+	PidReadErr      string
 	PidOwnerOK      bool
 	ConfigMode      int
 	KnowledgeOK     bool
@@ -68,7 +69,10 @@ func Run(d Deps) Report {
 
 	pidOK := true
 	pidDetail := "service is not running; pidfile not required"
-	if d.PidRunning {
+	if d.PidReadErr != "" {
+		pidOK = false
+		pidDetail = d.PidReadErr
+	} else if d.PidRunning {
 		pidDetail = "pidfile present"
 		s := strings.TrimSpace(d.PidContent)
 		if s == "" {

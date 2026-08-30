@@ -92,3 +92,32 @@ func TestRun_ReportsAllResourcesEvenUnused(t *testing.T) {
 		}
 	}
 }
+
+func TestRun_UnreadablePidfileNotEmpty(t *testing.T) {
+	r := doctor.Run(doctor.Deps{
+		Cfg:         config.Default(),
+		PidRunning:  true,
+		PidReadErr:  "pidfile is unreadable: permission denied",
+		PidOwnerOK:  true,
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 1},
+	})
+	if r.Healthy {
+		t.Fatal("unreadable pidfile must be unhealthy")
+	}
+	for _, c := range r.Checks {
+		if c.Name != "pidfile" {
+			continue
+		}
+		if strings.Contains(c.Detail, "empty") {
+			t.Fatalf("unreadable must not be reported as empty: %q", c.Detail)
+		}
+		if !strings.Contains(c.Detail, "unreadable") {
+			t.Fatalf("want unreadable: %q", c.Detail)
+		}
+		return
+	}
+	t.Fatal("missing pidfile check")
+}
+

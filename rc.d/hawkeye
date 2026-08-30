@@ -34,6 +34,7 @@ update_cmd="hawkeye_update"
 doctor_cmd="hawkeye_doctor"
 checkconfig_cmd="hawkeye_checkconfig"
 start_precmd="hawkeye_prestart"
+start_postcmd="hawkeye_poststart"
 stop_postcmd="hawkeye_poststop"
 
 hawkeye_checkconfig()
@@ -73,6 +74,15 @@ hawkeye_prestart()
 		export HAWKEYE_MCP_TOKEN_FILE
 	else
 		warn "hawkeye_mcp is NO; enable it to run the MCP listener"
+	fi
+}
+
+hawkeye_poststart()
+{
+	# PID is not a secret. daemon(8) creates the pidfile 0600; doctor
+	# as a non-root operator must be able to read it.
+	if [ -f "${pidfile}" ]; then
+		chmod 0644 "${pidfile}" || warn "hawkeye: could not set pidfile mode 0644"
 	fi
 }
 
