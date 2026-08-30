@@ -1,0 +1,142 @@
+.Dd August 30, 2026
+.Dt HAWKEYE 8
+.Os CloudBSD
+.Sh NAME
+.Nm hawkeye
+.Nd FreeBSD diagnostic and operations doctor (MASH)
+.Sh SYNOPSIS
+.Nm
+.Op Fl -config Ar path
+.Op Fl -check-config
+.Op Fl -json
+.Ar command
+.Op Ar args
+.Sh DESCRIPTION
+.Nm
+is a privileged FreeBSD diagnostic and operations tool.
+It consults a local knowledge corpus (from the sibling
+.Nm hawkeye-data
+project), optionally a local or remote LLM, and can apply operator-confirmed
+plans.
+It is
+.Em not
+a public chat UI.
+.Pp
+Knowledge is consumed, never vendored in this repository.
+.Sh COMMANDS
+.Bl -tag -width indent
+.It Nm consult Op Ar query
+Diagnose using FTS knowledge and an optional LLM.
+Performs no writes.
+On a read-only root the first skill is
+.Cm unlock-rw ,
+not
+.Cm pkg .
+.It Nm plan Op Ar query
+Emit a JSON plan.
+No mutation.
+.It Nm apply Op Fl -dry-run | Fl -yes Op Ar plan.json
+Apply a plan.
+The default is dry-run.
+.Fl -yes
+is required to mutate.
+LLM actors never execute privileged steps; the operator CLI is the mutator.
+Applies are audited.
+.It Nm doctor
+Service health: configuration, permissions, pidfile, dependencies, and
+resource headroom.
+Prints human-readable evidence and JSON.
+Exits non-zero if unhealthy.
+.It Nm mcp Op Fl -stdio | Fl -http
+MCP server.
+.Fl -stdio
+is the default.
+.Fl -http
+is Streamable HTTP over TLS bound to loopback
+.Pq 127.0.0.1
+by default.
+MCP tools use the same plan/apply gate.
+.It Nm update
+Refresh knowledge artifacts from
+.Nm hawkeye-data
+when the root is writable.
+Refused on a read-only root.
+.It Nm init Op Ar dir
+Write a sample JSON configuration
+.Pq mode 0600 .
+.El
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl -config Ar path
+JSON configuration file.
+Default search:
+.Pa /usr/local/etc/cloudbsd/hawkeye/config.json
+then
+.Pa $XDG_CONFIG_HOME/hawkeye/config.json .
+.It Fl -check-config
+Validate the configuration and exit.
+Must succeed before a SIGHUP reload.
+.It Fl -json
+Prefer JSON output
+.Pq doctor .
+.It Fl -dry-run
+Force apply dry-run
+.Pq default .
+.It Fl -yes
+Permit mutation for
+.Nm apply .
+.El
+.Sh SIGNALS
+.Bl -tag -width indent
+.It Dv SIGHUP
+Validate the configuration
+.Pq same rules as Fl -check-config
+then reload in place.
+If validation fails, keep the old process and old configuration.
+Reload is a no-op failure, not a crash.
+.El
+.Sh TIERS
+.Bl -tag -width indent
+.It 0
+Rescue: read-only root, maybe no
+.Pa /usr
+or
+.Pa /var ,
+no network, no GPU.
+Knowledge from
+.Pa /boot/hawkeye .
+FTS only; LLM not required.
+.It 1
+Root writable, islanded.
+CPU embedder if RAM allows.
+.It 2
+Network up.
+May escalate large jobs to a remote LLM.
+GPU is used if it works and is not required otherwise.
+.El
+.Sh FILES
+.Bl -tag -width indent
+.It Pa /usr/local/etc/cloudbsd/hawkeye/config.json
+System configuration.
+.It Pa /usr/local/etc/rc.d/hawkeye
+rc.d script.
+.It Pa /var/run/hawkeye.pid
+Pidfile.
+.It Pa /boot/hawkeye
+Rescue knowledge
+.Pq read-only .
+.It Pa /usr/local/share/hawkeye
+System knowledge artifacts from
+.Nm hawkeye-data .
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Nm doctor
+exits non-zero when unhealthy.
+.Sh SEE ALSO
+.Xr hawkeye.conf 5 ,
+.Xr rc 8
+.Sh AUTHORS
+.An Mark LaPointe Aq Mt mark@cloudbsd.org
+.Pp
+Copyright (c) 2026 REVYTECH, Inc.

@@ -1,0 +1,86 @@
+#!/bin/sh
+
+# PROVIDE: hawkeye
+# REQUIRE: FILESYSTEMS
+# KEYWORD: shutdown
+
+# Optional rc.d service: refresh hawkeye-data artifacts and optionally
+# run a localhost MCP listener. This is NOT a public chat UI.
+
+. /etc/rc.subr
+
+name="hawkeye"
+desc="Hawkeye knowledge updater and optional localhost MCP"
+rcvar="hawkeye_enable"
+
+load_rc_config ${name}
+
+: ${hawkeye_enable:="NO"}
+: ${hawkeye_update:="YES"}
+: ${hawkeye_mcp:="NO"}
+: ${hawkeye_user:="root"}
+: ${hawkeye_pidfile:="/var/run/hawkeye.pid"}
+: ${hawkeye_config:="/usr/local/etc/cloudbsd/hawkeye/config.json"}
+
+pidfile="${hawkeye_pidfile}"
+procname="/usr/local/bin/hawkeye"
+command="/usr/sbin/daemon"
+
+extra_commands="reload update doctor checkconfig"
+reload_cmd="hawkeye_reload"
+update_cmd="hawkeye_update"
+doctor_cmd="hawkeye_doctor"
+checkconfig_cmd="hawkeye_checkconfig"
+start_precmd="hawkeye_prestart"
+stop_postcmd="hawkeye_poststop"
+
+hawkeye_checkconfig()
+{
+	"${procname}" --config "${hawkeye_config}" --check-config
+}
+
+hawkeye_update()
+{
+	"${procname}" --config "${hawkeye_config}" update
+}
+
+hawkeye_doctor()
+{
+	"${procname}" --config "${hawkeye_config}" doctor
+}
+
+hawkeye_prestart()
+{
+	hawkeye_checkconfig || return 1
+	if [ "${hawkeye_update}" = "YES" ]; then
+		hawkeye_update || warn "hawkeye update failed (continuing)"
+	fi
+	if [ "${hawkeye_mcp}" != "YES" ]; then
+		warn "hawkeye_mcp is NO; enable it to run the localhost MCP listener"
+	fi
+}
+
+hawkeye_poststop()
+{
+	rm -f "${pidfile}"
+}
+
+hawkeye_reload()
+{
+	hawkeye_checkconfig || return 1
+	if [ -f "${pidfile}" ]; then
+		kill -HUP "$(cat "${pidfile}")" || return 1
+	else
+		warn "pidfile missing; reload is a no-op"
+		return 1
+	fi
+}
+
+if [ "${hawkeye_mcp}" = "YES" ]; then
+	command_args="-P ${pidfile} -u ${hawkeye_user} -f ${procname} --config ${hawkeye_config} mcp --http"
+else
+	# Long-running placeholder so SIGHUP reload remains available.
+	command_args="-P ${pidfile} -u ${hawkeye_user} -f /usr/bin/true"
+fi
+
+run_rc_command "$1"

@@ -1,0 +1,65 @@
+# github.com/revytechinc/hawkeye/internal/knowledge
+internal/knowledge/knowledge_test.go:27:32: string literal not terminated
+FAIL	github.com/revytechinc/hawkeye/internal/knowledge [setup failed]
+# github.com/revytechinc/hawkeye/internal/doctor
+internal/doctor/doctor.go:49:33: newline in string
+internal/doctor/doctor.go:50:2: newline in string
+internal/doctor/doctor.go:51:1: missing return
+--- FAIL: TestString_RedactsFakeOpenSSHKey (0.00s)
+    redact_test.go:19: private key material leaked: "-----BEGIN OPENSSH PRIVATE KEY-----\nFAKE_TEST_KEY_NOT_A_REAL_SECRET_aaaaaaaa\n-----END OPENSSH PRIVATE KEY-----"
+--- FAIL: TestString_RedactsFakePasswordJSON (0.00s)
+    redact_test.go:30: password leaked: "{\"username\":\"operator\",\"password\":\"fake-password-for-tests-only\"}"
+--- FAIL: TestString_RedactsFakeAPIToken (0.00s)
+    redact_test.go:38: api token leaked: "api_token=fake_api_token_AAAAAAAAAAAAAAAA"
+--- FAIL: TestString_RedactsFakeHtpasswd (0.00s)
+    redact_test.go:46: htpasswd blob leaked: "testuser:$apr1$faketest$abcdefghijklmnopqrstuv"
+--- FAIL: TestString_RedactsFakeBasicBlob (0.00s)
+    redact_test.go:54: Basic blob leaked: "Authorization: Basic ZmFrZXVzZXI6ZmFrZXBhc3M="
+--- FAIL: TestString_RedactsFakeBearerAndPATs (0.00s)
+    redact_test.go:69: github pat leaked: "Bearer FAKESECRET_a3b4c5d6e7f8g9h0i1j2\nghp_FakeGitHubTokenForTestsOnly1234567890\nsk-fakeOpenAIKeyForTestsOnly1234567890abcd"
+--- FAIL: TestContainsSecret_FakeFixtureFile (0.00s)
+    redact_test.go:90: expected fake fixture to be detected as containing secrets
+FAIL
+FAIL	github.com/revytechinc/hawkeye/internal/redact	0.003s
+--- FAIL: TestResolveMode_DefaultIsDryRun (0.00s)
+    apply_test.go:30: default mode = apply, want dry-run
+--- FAIL: TestResolveMode_YesMutatesUnlessDryRun (0.00s)
+    apply_test.go:39: --dry-run wins over --yes: got apply
+--- FAIL: TestExecute_DefaultDryRunDoesNotCallExecutor (0.00s)
+    apply_test.go:57: result {DryRun:false Applied:true Steps:[]}
+--- FAIL: TestExecute_YesCallsExecutorForOperator (0.00s)
+    apply_test.go:68: calls = 0
+--- FAIL: TestExecute_LLMActorNeverExecsPrivileged (0.00s)
+    apply_test.go:79: expected error: LLM must not exec as root
+--- FAIL: TestExecute_MCPActorPrivilegedIsDryRunOnly (0.00s)
+    apply_test.go:99: MCP apply must remain dry-run for privileged steps
+FAIL
+FAIL	github.com/revytechinc/hawkeye/internal/apply	0.002s
+--- FAIL: TestProbe_RescueROIsTier0AndUnlockRW (0.00s)
+    probe_test.go:42: expected root RO: {Securelevel:0 SecurelevelOK:false RootRO:false UsrPresent:false VarPresent:false NetworkUp:false GPUPresent:false RescuePresent:false ZFSReadOnly:false Tier:2}
+--- FAIL: TestProbe_WritableIslandedIsTier1 (0.00s)
+    probe_test.go:69: tier = 2, want 1
+--- FAIL: TestProbe_NetworkUpIsTier2 (0.00s)
+    probe_test.go:88: {Securelevel:0 SecurelevelOK:false RootRO:false UsrPresent:false VarPresent:false NetworkUp:false GPUPresent:false RescuePresent:false ZFSReadOnly:false Tier:2}
+--- FAIL: TestProbe_ZFSReadOnlyCountsAsRootRO (0.00s)
+    probe_test.go:100: {Securelevel:0 SecurelevelOK:false RootRO:false UsrPresent:false VarPresent:false NetworkUp:false GPUPresent:false RescuePresent:false ZFSReadOnly:false Tier:2}
+FAIL
+FAIL	github.com/revytechinc/hawkeye/internal/probe	0.002s
+--- FAIL: TestCheckFile_RejectsInvalidJSON (0.00s)
+    config_test.go:58: expected invalid JSON to fail --check-config
+--- FAIL: TestCheckFile_RejectsComments (0.00s)
+    config_test.go:69: JSONC must be rejected
+--- FAIL: TestValidate_RejectsPublicBind (0.00s)
+    config_test.go:77: public bind must be rejected by default validator
+--- FAIL: TestValidate_RejectsUnknownLogLevel (0.00s)
+    config_test.go:85: expected log_level error
+FAIL
+FAIL	github.com/revytechinc/hawkeye/internal/config	0.004s
+FAIL	github.com/revytechinc/hawkeye/internal/doctor [build failed]
+--- FAIL: TestAllow_ExhaustedRAMBlocks (0.00s)
+    headroom_test.go:26: expected RAM headroom failure
+--- FAIL: TestAllow_GPUJobFailsWhenRequiredVRAMExhausted (0.00s)
+    headroom_test.go:36: expected VRAM headroom failure
+FAIL
+FAIL	github.com/revytechinc/hawkeye/internal/headroom	0.002s
+FAIL

@@ -1,0 +1,35 @@
+{
+  "log_level": "INFO",
+  "listen": {
+    "mcp_http": "127.0.0.1:8741",
+    "tls_cert": "",
+    "tls_key": ""
+  },
+  "knowledge": {
+    "paths": [
+      "/boot/hawkeye",
+      "/usr/local/share/hawkeye"
+    ]
+  },
+  "llm": {
+    "local": {
+      "backend": "llama.cpp",
+      "model_path": "",
+      "prefer_gpu": true,
+      "require_gpu": false
+    },
+    "remote": {
+      "provider": "",
+      "endpoint": "",
+      "api_key_env": "HAWKEYE_LLM_API_KEY"
+    }
+  },
+  "resources": {
+    "ram_min_free_bytes": 268435456,
+    "cpu_max_pct": 90,
+    "disk_min_free_bytes": 104857600,
+    "gpu_vram_min_free_bytes": null
+  },
+  "pidfile": "/var/run/hawkeye.pid",
+  "audit_log": "/var/log/hawkeye/audit.log"
+}

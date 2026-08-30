@@ -1,0 +1,8 @@
+Hawkeye is a privileged FreeBSD diagnostic and operations doctor (MASH).
+It consults local knowledge (FTS SQLite from hawkeye-data), optionally a
+local llama.cpp model or a remote LLM, and applies operator-confirmed
+plans. Apply defaults to dry-run. It is not a public chat UI.
+
+This port is binaries only. Knowledge artifacts come from hawkeye-data.
+
+WWW: https://github.com/revytechinc/hawkeye

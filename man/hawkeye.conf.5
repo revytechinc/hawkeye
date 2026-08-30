@@ -1,0 +1,115 @@
+.Dd August 30, 2026
+.Dt HAWKEYE.CONF 5
+.Os CloudBSD
+.Sh NAME
+.Nm hawkeye.conf
+.Nd JSON configuration for
+.Xr hawkeye 8
+.Sh DESCRIPTION
+Configuration is strict JSON
+.Pq RFC 8259 .
+No comments, no trailing commas, no JSONC.
+Secrets belong in environment variables, never in the file.
+Files that might hold secrets are mode
+.Li 0600 .
+.Pp
+System path:
+.Pa /usr/local/etc/cloudbsd/hawkeye/config.json
+.Pp
+Per-user path:
+.Pa $XDG_CONFIG_HOME/hawkeye/config.json
+.Pq default
+.Pa ~/.config/hawkeye/config.json
+.Pp
+Generate a sample with
+.Nm hawkeye Cm init .
+Validate with
+.Nm hawkeye Fl -check-config
+before
+.Dv SIGHUP .
+.Sh KEYS
+.Bl -tag -width indent
+.It Va log_level
+.Li DEBUG ,
+.Li INFO ,
+.Li WARN ,
+or
+.Li ERROR .
+.It Va listen.mcp_http
+MCP Streamable HTTP bind address.
+Must be loopback.
+Default
+.Li 127.0.0.1:8741 .
+.It Va listen.tls_cert , Va listen.tls_key
+PEM paths required for MCP HTTP.
+.It Va knowledge.paths
+Ordered search paths for
+.Pa knowledge.sqlite .
+Default
+.Pa /boot/hawkeye
+then
+.Pa /usr/local/share/hawkeye .
+XDG data dirs are also searched.
+.It Va llm.local.backend
+Local backend.
+Default
+.Li llama.cpp .
+.It Va llm.local.model_path
+Path to a local model.
+Empty means LLM is optional.
+.It Va llm.local.prefer_gpu
+Try GPU then CPU.
+.It Va llm.local.require_gpu
+If true, GPU jobs fail when no GPU is present.
+Default false.
+Missing GPU must not block jobs that do not need GPU.
+.It Va llm.remote.provider
+Optional remote provider name
+.Pq Grok, FreeGrok, Claude .
+.It Va llm.remote.endpoint
+Optional HTTPS endpoint.
+.It Va llm.remote.api_key_env
+Name of the environment variable that holds the API key.
+Default
+.Ev HAWKEYE_LLM_API_KEY .
+The key itself is never stored in JSON.
+.It Va resources.ram_min_free_bytes
+Refuse RAM-consuming jobs when free RAM is below this.
+.It Va resources.cpu_max_pct
+Refuse CPU-consuming jobs when host CPU is above this.
+.It Va resources.disk_min_free_bytes
+Refuse disk-consuming jobs when free disk is below this.
+.It Va resources.gpu_vram_min_free_bytes
+Refuse GPU jobs when free VRAM is below this.
+Null means unused.
+Doctor still reports GPU presence.
+.It Va pidfile
+Pidfile path.
+Must not be empty or negative.
+.It Va audit_log
+JSON-lines apply audit log.
+Mode 0600 when created.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width indent
+.It Ev HAWKEYE_CONFIG
+Override config path.
+.It Ev HAWKEYE_LLM_API_KEY
+Remote LLM API key
+.Pq never placed in the JSON file .
+.It Ev HAWKEYE_KNOWLEDGE_PATH
+Extra knowledge directory for tests and rescue overlays.
+.It Ev HAWKEYE_DATA_ARTIFACT
+Source
+.Pa knowledge.sqlite
+for
+.Nm hawkeye Cm update .
+.It Ev XDG_CONFIG_HOME , Ev XDG_DATA_HOME
+Per-user config and data.
+.El
+.Sh SEE ALSO
+.Xr hawkeye 8
+.Sh AUTHORS
+.An Mark LaPointe Aq Mt mark@cloudbsd.org
+.Pp
+Copyright (c) 2026 REVYTECH, Inc.

@@ -1,0 +1,5 @@
+bin/hawkeye
+etc/cloudbsd/hawkeye/config.json.sample
+etc/rc.d/hawkeye
+share/man/man8/hawkeye.8.gz
+share/man/man5/hawkeye.conf.5.gz
