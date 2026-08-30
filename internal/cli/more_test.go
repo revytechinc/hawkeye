@@ -4,11 +4,13 @@
 package cli_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/revytechinc/hawkeye/internal/cli"
 	"github.com/revytechinc/hawkeye/internal/config"
 )
 
@@ -103,5 +105,13 @@ func TestHelpNoArgs(t *testing.T) {
 	code, out, _ := run(t, []string{}, "", fakeHost{}, nil)
 	if code != 0 || !strings.Contains(out, "Usage") {
 		t.Fatal(out)
+	}
+}
+
+func TestRunWrapper(t *testing.T) {
+	var out, errb bytes.Buffer
+	code := cli.Run([]string{"hawkeye", "--version"}, bytes.NewReader(nil), &out, &errb)
+	if code != 0 {
+		t.Fatal(code, errb.String())
 	}
 }

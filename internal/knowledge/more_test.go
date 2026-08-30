@@ -5,6 +5,7 @@ package knowledge_test
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -71,5 +72,31 @@ func TestSearchAndCloseNil(t *testing.T) {
 	}
 	if _, err := st.Search("x", 1); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestOpen_EmptyPaths(t *testing.T) {
+	_, err := knowledge.Open(nil, true)
+	if err == nil {
+		t.Fatal("expected not found")
+	}
+}
+
+func TestOpen_SkipsGarbageThenOpensNext(t *testing.T) {
+	dir1 := t.TempDir()
+	dir2 := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir1, "knowledge.sqlite"), []byte("not a database"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := knowledge.CreateTestDB(filepath.Join(dir2, "knowledge.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	st, err := knowledge.Open([]string{dir1, dir2}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if !st.Immutable || !st.FTS {
+		t.Fatalf("%+v", st)
 	}
 }

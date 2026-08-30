@@ -50,3 +50,23 @@ func TestModeString(t *testing.T) {
 		t.Fatal("strings")
 	}
 }
+
+type failAud struct{}
+
+func (failAud) Record(apply.Plan, apply.Mode, apply.Actor, apply.Result) error {
+	return errors.New("audit")
+}
+
+func TestExecute_AuditorError(t *testing.T) {
+	p := apply.Plan{ID: "p", Source: "operator"}
+	if _, err := apply.Execute(p, apply.ModeDryRun, apply.ActorOperator, &apply.CountingExecutor{}, failAud{}); err == nil {
+		t.Fatal("expected auditor error")
+	}
+}
+
+func TestExecute_UnprivilegedPlan(t *testing.T) {
+	p := apply.Plan{ID: "p", Source: "operator", Steps: []apply.Step{{ID: "1", Privileged: false, Argv: []string{"true"}}}}
+	if p.Privileged() {
+		t.Fatal("not privileged")
+	}
+}

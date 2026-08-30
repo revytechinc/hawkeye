@@ -16,6 +16,12 @@ import (
 
 var ErrNotFound = errors.New("knowledge database not found")
 
+// Test hooks. Production uses sql.Open and filepath.Abs.
+var (
+	sqlOpen = sql.Open
+	absPath = filepath.Abs
+)
+
 const DBName = "knowledge.sqlite"
 
 type Store struct {
@@ -44,10 +50,10 @@ func SearchPaths(xdgDataHome, home string) []string {
 	return out
 }
 
-func fileDSN(path string, immutable bool) (string, error) {
-	abs, err := filepath.Abs(path)
+func fileDSN(path string, immutable bool) string {
+	abs, err := absPath(path)
 	if err != nil {
-		return "", err
+		abs = path
 	}
 	u := url.URL{Scheme: "file", Path: filepath.ToSlash(abs)}
 	q := url.Values{}
@@ -56,7 +62,7 @@ func fileDSN(path string, immutable bool) (string, error) {
 		q.Set("immutable", "1")
 	}
 	u.RawQuery = q.Encode()
-	return u.String(), nil
+	return u.String()
 }
 
 func Open(paths []string, rootRO bool) (*Store, error) {
@@ -70,11 +76,8 @@ func Open(paths []string, rootRO bool) (*Store, error) {
 			last = err
 			continue
 		}
-		dsn, err := fileDSN(p, rootRO)
-		if err != nil {
-			return nil, err
-		}
-		db, err := sql.Open("sqlite", dsn)
+		dsn := fileDSN(p, rootRO)
+		db, err := sqlOpen("sqlite", dsn)
 		if err != nil {
 			last = err
 			continue
