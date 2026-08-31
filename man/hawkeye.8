@@ -1,4 +1,4 @@
-.Dd August 30, 2026
+.Dd August 31, 2026
 .Dt HAWKEYE 8
 .Os CloudBSD
 .Sh NAME
@@ -40,13 +40,28 @@ install of the data port is not required.
 .It Nm consult Op Ar query
 Diagnose using FTS knowledge and an optional LLM.
 Performs no writes.
+Default stdout is an operator session: the query, then ranked hits as
+title, short summary, and the playbook steps or commands stored in the
+knowledge kit.
+.Fl -json
+or
+.Ev HAWKEYE_JSON
+set to
+.Li 1
+emits the machine object instead.
 On a read-only root the first skill is
 .Cm unlock-rw ,
 not
 .Cm pkg .
 .It Nm plan Op Ar query
-Emit a JSON plan.
+Propose steps.
 No mutation.
+Default stdout is operator-readable prose.
+.Fl -json
+or
+.Ev HAWKEYE_JSON
+emits the JSON plan for
+.Nm apply .
 .It Nm apply Op Fl -dry-run | Fl -yes Op Ar plan.json
 Apply a plan.
 The default is dry-run.
@@ -101,8 +116,11 @@ if present, else
 Validate the configuration and exit.
 Must succeed before a SIGHUP reload.
 .It Fl -json
-Prefer JSON output
-.Pq doctor .
+Prefer JSON output for
+.Nm consult ,
+.Nm plan ,
+and
+.Nm doctor .
 .It Fl -dry-run
 Force apply dry-run
 .Pq default .

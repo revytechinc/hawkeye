@@ -267,3 +267,66 @@ Fixes:
 
 `mandoc -T lint` STYLE only (Os CloudBSD, Xr not installed in PATH).
 
+## 11. Consult/plan human TTY (2026-08-31)
+
+T013: default `hawkeye consult` / `hawkeye plan` are an operator session, not a JSON blob.
+`--json` and `HAWKEYE_JSON=1` still emit the machine object. MCP tools stay JSON on the wire.
+
+Red (Human() missing; default CLI still dumped JSON):
+
+```
+# github.com/revytechinc/hawkeye/internal/apply_test
+internal/apply/human_test.go:26:11: p.Human undefined
+# github.com/revytechinc/hawkeye/internal/consult_test
+internal/consult/human_test.go:39:11: r.Human undefined
+--- FAIL: TestConsult_DefaultIsHumanNotJSON
+    human_test.go:26: default consult must be operator prose, not JSON:
+        { "query": "ZFS root is read-only after boot", "hits": [ { "Title": ... } ] }
+--- FAIL: TestPlan_DefaultIsHumanNotJSON
+```
+
+Green:
+
+`go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply     coverage: 98.8%
+ok  github.com/revytechinc/hawkeye/internal/cli       coverage: 77.1%
+ok  github.com/revytechinc/hawkeye/internal/consult   coverage: 96.7%
+ok  github.com/revytechinc/hawkeye/internal/doctor    coverage: 95.9%
+ok  github.com/revytechinc/hawkeye/internal/mcp       coverage: 83.5%
+ok  github.com/revytechinc/hawkeye/internal/redact    coverage: 100.0%
+total: (statements) 86.1%
+```
+
+New formatters: `consult.Result.Human` 96.2%, `apply.Plan.Human` 100%, `wantJSON` 100%. Redact remains 100%.
+
+`--check-config` on `configs/config.example.json`: exit 0 (`configuration ok`).
+
+`hawkeye doctor` (no kit on this host): UNHEALTHY, dependencies FAIL, GPU absent is ok. Exit 1. Human + JSON both printed.
+
+Operator session (fixture kit; this host is writable so tier 2):
+
+```
+$ hawkeye consult 'ZFS root is read-only after boot'
+consult  ZFS root is read-only after boot
+tier 2
+llm skipped: local llm model is not configured
+
+1. Remount ZFS root read-write
+   Root is a ZFS dataset and is mounted read-only after boot.
+
+   If the root pool is imported readonly, remount ZFS read-write.
+
+   export PATH=/rescue:/sbin:/bin
+   zfs set readonly=off "$ROOTDS"
+   mount -u -o rw /
+```
+
+`--json` still dumps the machine object (`"query"`, `"hits"`, `"title"`).
+`hawkeye plan 'restart sshd'` prints prose; `hawkeye plan --json` prints the plan object.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros present; `HAWKEYE_JSON` documented in `hawkeye.conf(5)`.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+

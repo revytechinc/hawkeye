@@ -193,8 +193,10 @@ Usage:
   hawkeye [--config PATH] [--check-config] [--json] <command> [args]
 
 Commands:
-  consult [query]     Diagnose using knowledge FTS and optional LLM (no writes)
-  plan [query]        Emit a JSON plan; no mutation
+  consult [query]     Diagnose using knowledge FTS and optional LLM (no writes).
+                      Human session on stdout; --json or HAWKEYE_JSON=1 for scripts.
+  plan [query]        Propose steps; no mutation.
+                      Human session on stdout; --json or HAWKEYE_JSON=1 for apply.
   apply [--dry-run|--yes] [plan.json]
                       Mutate. DEFAULT is dry-run. LLM never execs as root.
   doctor              Service health (config, perms, pidfile, deps, headroom)
@@ -286,13 +288,31 @@ func cmdConsult(env Env, fs flagset, cfg config.Config) int {
 		fmt.Fprintln(env.Stderr, err)
 		return 1
 	}
-	b, err := res.JSON()
-	if err != nil {
-		fmt.Fprintln(env.Stderr, err)
-		return 1
+	if wantJSON(fs, env.Getenv) {
+		b, err := res.JSON()
+		if err != nil {
+			fmt.Fprintln(env.Stderr, err)
+			return 1
+		}
+		_, _ = env.Stdout.Write(append(b, '\n'))
+		return 0
 	}
-	_, _ = env.Stdout.Write(append(b, '\n'))
+	fmt.Fprint(env.Stdout, res.Human())
 	return 0
+}
+
+func wantJSON(fs flagset, getenv func(string) string) bool {
+	if fs.json {
+		return true
+	}
+	if getenv == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(getenv("HAWKEYE_JSON"))) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }
 
 func makePlan(query string, snap probe.Snapshot) apply.Plan {
@@ -325,12 +345,16 @@ func cmdPlan(env Env, fs flagset, cfg config.Config) int {
 	}
 	snap := probe.Probe(env.Host)
 	p := makePlan(q, snap)
-	enc := json.NewEncoder(env.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(p); err != nil {
-		fmt.Fprintln(env.Stderr, err)
-		return 1
+	if wantJSON(fs, env.Getenv) {
+		enc := json.NewEncoder(env.Stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(p); err != nil {
+			fmt.Fprintln(env.Stderr, err)
+			return 1
+		}
+		return 0
 	}
+	fmt.Fprint(env.Stdout, p.Human())
 	return 0
 }
 
