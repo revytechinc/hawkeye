@@ -93,6 +93,51 @@ func TestRun_ReportsAllResourcesEvenUnused(t *testing.T) {
 	}
 }
 
+func TestRun_UnhealthyWhenPidfileMode0600(t *testing.T) {
+	r := doctor.Run(doctor.Deps{
+		Cfg:         config.Default(),
+		PidRunning:  true,
+		PidContent:  "4242\n",
+		PidOwnerOK:  true,
+		PidMode:     0o600,
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 1},
+	})
+	if r.Healthy {
+		t.Fatal("0600 pidfile must be unhealthy even when root can read it")
+	}
+	for _, c := range r.Checks {
+		if c.Name != "pidfile" {
+			continue
+		}
+		if strings.Contains(c.Detail, "empty") {
+			t.Fatalf("0600 must not be reported as empty: %q", c.Detail)
+		}
+		if !strings.Contains(c.Detail, "0600") && !strings.Contains(c.Detail, "world-readable") {
+			t.Fatalf("want world-readable/0600: %q", c.Detail)
+		}
+		return
+	}
+	t.Fatal("missing pidfile check")
+}
+
+func TestRun_HealthyWhenPidfileReadable0644(t *testing.T) {
+	r := doctor.Run(doctor.Deps{
+		Cfg:         config.Default(),
+		PidRunning:  true,
+		PidContent:  "4242\n",
+		PidOwnerOK:  true,
+		PidMode:     0o644,
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 1},
+	})
+	if !r.Healthy {
+		t.Fatalf("0644 pidfile must be healthy for operator doctor: %+v", r)
+	}
+}
+
 func TestRun_UnreadablePidfileNotEmpty(t *testing.T) {
 	r := doctor.Run(doctor.Deps{
 		Cfg:         config.Default(),
