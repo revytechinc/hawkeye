@@ -166,6 +166,10 @@ func printApply(env Env, cfg config.Config, plan apply.Plan, mode apply.Mode) in
 }
 
 func executePlan(env Env, cfg config.Config, p apply.Plan, mode apply.Mode) (apply.Result, error) {
+	return executePlanActor(env, cfg, p, mode, apply.ActorOperator)
+}
+
+func executePlanActor(env Env, cfg config.Config, p apply.Plan, mode apply.Mode, actor apply.Actor) (apply.Result, error) {
 	auditor, err := applyAuditor(cfg, mode)
 	if err != nil {
 		return apply.Result{}, err
@@ -174,7 +178,15 @@ func executePlan(env Env, cfg config.Config, p apply.Plan, mode apply.Mode) (app
 	if ex == nil {
 		ex = apply.SysExecutor{}
 	}
-	return apply.Execute(p, mode, apply.ActorOperator, ex, auditor)
+	return apply.Execute(p, mode, actor, ex, auditor)
+}
+
+// mcpApply is the same gate as CLI apply: ResolveMode (default dry-run,
+// --yes to land, --dry-run wins), SysExecutor, and the configured auditor.
+// Privileged plans stay dry-run under ActorMCP even when yes is set.
+func mcpApply(env Env, cfg config.Config, p apply.Plan, yes bool) (any, error) {
+	mode := apply.ResolveMode(!yes, yes)
+	return executePlanActor(env, cfg, p, mode, apply.ActorMCP)
 }
 
 func applyAuditor(cfg config.Config, mode apply.Mode) (apply.Auditor, error) {

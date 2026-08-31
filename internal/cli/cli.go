@@ -465,8 +465,7 @@ func cmdMCP(env Env, fs flagset, cfg config.Config) int {
 			return makePlan(q, snap, st), nil
 		},
 		Apply: func(p apply.Plan, yes bool) (any, error) {
-			mode := apply.ResolveMode(!yes, yes)
-			return apply.Execute(p, mode, apply.ActorMCP, &apply.CountingExecutor{}, apply.NopAuditor{})
+			return mcpApply(env, cfg, p, yes)
 		},
 		Doctor: func() (any, error) {
 			// reuse cmdDoctor logic without printing

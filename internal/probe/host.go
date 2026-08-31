@@ -18,6 +18,9 @@ type DefaultHost struct {
 	Glob       func(string) ([]string, error)
 	MountTable func() (string, error) // mount -p / getfsstat text; tests inject this
 	Sysctl     func(string) (int, bool)
+	// Ifaces injects a FreeBSD getifaddrs/ifconfig view. Tests use this
+	// instead of faking Linux /sys/class/net/*/carrier.
+	Ifaces func() ([]IfaceStatus, error)
 }
 
 func Live() DefaultHost {
@@ -86,13 +89,29 @@ func (h DefaultHost) MountReadOnly(path string) bool {
 }
 
 func (h DefaultHost) NetworkCarrier() bool {
+	if h.sysfsCarrier() {
+		return true
+	}
+	if h.Ifaces != nil {
+		ifaces, err := h.Ifaces()
+		if err == nil {
+			return CarrierUp(ifaces)
+		}
+	}
+	return liveNetworkCarrier()
+}
+
+func (h DefaultHost) sysfsCarrier() bool {
 	g := h.Glob
 	if g == nil {
 		g = filepath.Glob
 	}
-	matches, _ := g("/sys/class/net/*/carrier")
+	matches, err := g("/sys/class/net/*/carrier")
+	if err != nil || len(matches) == 0 {
+		return false
+	}
 	for _, m := range matches {
-		if strings.Contains(m, "/lo/") {
+		if strings.Contains(m, "/lo/") || IsLoopbackName(sysfsIfaceName(m)) {
 			continue
 		}
 		if strings.TrimSpace(h.read(m)) == "1" {
@@ -100,6 +119,11 @@ func (h DefaultHost) NetworkCarrier() bool {
 		}
 	}
 	return false
+}
+
+func sysfsIfaceName(path string) string {
+	dir := filepath.Dir(path)
+	return filepath.Base(dir)
 }
 
 func (h DefaultHost) GPUPresent() bool {

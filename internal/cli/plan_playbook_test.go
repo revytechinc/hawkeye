@@ -165,3 +165,80 @@ func TestConsult_TTY_YesLandsPlaybookCommands(t *testing.T) {
 		t.Fatalf("apply must be audited: %s", b)
 	}
 }
+
+// TestConsult_TTY_YesAppliesPrintedPlaybookArgv is the lie-catcher:
+// TTY prints a playbook, then y must exec THAT playbook's stored argv,
+// not makePlan's echo <query> stub and not zfs set readonly=off <rootpool>.
+func TestConsult_TTY_YesAppliesPrintedPlaybookArgv(t *testing.T) {
+	ex := &apply.CountingExecutor{}
+	dir := playbookDir(t)
+	cfgPath, _ := auditConfig(t)
+	env := cli.Env{
+		Args:  []string{"hawkeye", "--config", cfgPath, "--yes", "consult", "ZFS", "root", "is", "read-only", "after", "boot"},
+		Stdin: strings.NewReader("y\n"),
+		Getenv: func(k string) string {
+			switch k {
+			case "HAWKEYE_KNOWLEDGE_PATH":
+				return dir
+			case "HAWKEYE_CONFIG":
+				return cfgPath
+			default:
+				return ""
+			}
+		},
+		Host: fakeHost{ro: true, rescue: true, usr: true, varp: true},
+		TTY:  true,
+		Exec: ex,
+	}
+	code, out, errb := runConsult(t, env)
+	if code != 0 {
+		t.Fatalf("%d %s %s", code, out, errb)
+	}
+	printed := printedPlaybookCommands(out)
+	if len(printed) == 0 {
+		t.Fatalf("TTY must print the playbook commands before the prompt:\n%s", out)
+	}
+	want := knowledge.RemountPlaybookCommands()
+	if strings.Join(printed, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("printed playbook %q want stored %q\nout=%s", printed, want, out)
+	}
+	got := make([]string, 0, len(ex.Argv))
+	for _, a := range ex.Argv {
+		got = append(got, strings.Join(a, " "))
+	}
+	if strings.Join(got, "\n") != strings.Join(printed, "\n") {
+		t.Fatalf("y applied argv %q, not the printed playbook %q", got, printed)
+	}
+	joined := strings.Join(got, "\n")
+	for _, junk := range []string{"echo ZFS", "echo <query>", "<rootpool>"} {
+		if strings.Contains(joined, junk) {
+			t.Fatalf("y applied stub %q: %q", junk, got)
+		}
+	}
+}
+
+func printedPlaybookCommands(out string) []string {
+	cut := strings.Index(out, "Apply these steps?")
+	if cut < 0 {
+		return nil
+	}
+	var cmds []string
+	for _, line := range strings.Split(out[:cut], "\n") {
+		if !strings.HasPrefix(line, "  ") {
+			continue
+		}
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		switch fields[0] {
+		case "export", "mount", "zfs", "echo", "sysctl", "service", "kenv":
+			cmds = append(cmds, line)
+		}
+	}
+	return cmds
+}
