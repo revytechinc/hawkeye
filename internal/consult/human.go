@@ -67,7 +67,7 @@ func writeLead(b *strings.Builder, h knowledge.Hit) {
 		b.WriteString(indentBlock(wrapWords(sum, wrapAt), indent))
 		b.WriteByte('\n')
 	}
-	body := storedSteps(title, h.Body)
+	body := storedSteps(h)
 	if body == "" {
 		return
 	}
@@ -87,12 +87,12 @@ func proseSummary(tags string) string {
 	return ""
 }
 
-func storedSteps(title, body string) string {
-	if cmds := fencedCommands(body); cmds != "" {
-		return cmds
+func storedSteps(h knowledge.Hit) string {
+	if cmds := CommandLines(h); len(cmds) > 0 {
+		return strings.Join(cmds, "\n")
 	}
-	body = unwrapFences(body)
-	body = dropDuplicateHeading(title, body)
+	body := unwrapFences(h.Body)
+	body = dropDuplicateHeading(strings.TrimSpace(h.Title), body)
 	return strings.TrimSpace(body)
 }
 
@@ -217,7 +217,7 @@ func actionScore(qtoks []string, h knowledge.Hit) int {
 	title := tokens(h.Title)
 	tags := tokens(h.Tags)
 	score := 3*overlap(qtoks, title) + 2*overlap(qtoks, tags)
-	if fencedCommands(h.Body) != "" {
+	if len(CommandLines(h)) > 0 {
 		score += 5
 	}
 	return score

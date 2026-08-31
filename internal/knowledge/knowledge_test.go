@@ -183,3 +183,33 @@ func TestOpen_HarvestSchemaFTS(t *testing.T) {
 		t.Fatal("expected hit for consult query with hyphen")
 	}
 }
+
+func TestSearch_PlaybookCommandsFromStore(t *testing.T) {
+	dir := t.TempDir()
+	if err := knowledge.CreatePlaybookTestDB(filepath.Join(dir, "knowledge.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	st, err := knowledge.Open([]string{dir}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	hits, err := st.Search("ZFS root is read-only after boot", 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var remount *knowledge.Hit
+	for i := range hits {
+		if hits[i].Title == knowledge.RemountPlaybookTitle {
+			remount = &hits[i]
+			break
+		}
+	}
+	if remount == nil {
+		t.Fatalf("remount playbook missing: %#v", hits)
+	}
+	want := knowledge.RemountPlaybookCommands()
+	if strings.Join(remount.Commands, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("stored commands missing from hit: %#v", remount.Commands)
+	}
+}

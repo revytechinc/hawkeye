@@ -158,11 +158,20 @@ func Execute(plan Plan, mode Mode, actor Actor, exec Executor, auditor Auditor) 
 
 type SysExecutor struct{}
 
+func needsShell(line string) bool {
+	return strings.ContainsAny(line, " \t|$;&<>(){}'\"`\n") || strings.Contains(line, "=")
+}
+
 func (SysExecutor) Run(argv []string) (string, string, error) {
 	if len(argv) == 0 {
 		return "", "", errors.New("empty argv")
 	}
-	cmd := exec.Command(argv[0], argv[1:]...)
+	var cmd *exec.Cmd
+	if len(argv) == 1 && needsShell(argv[0]) {
+		cmd = exec.Command("/bin/sh", "-c", argv[0])
+	} else {
+		cmd = exec.Command(argv[0], argv[1:]...)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

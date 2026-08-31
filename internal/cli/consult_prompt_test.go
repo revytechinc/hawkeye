@@ -42,6 +42,25 @@ func knowledgeDir(t *testing.T) string {
 	return dir
 }
 
+func consultPlaybookEnv(t *testing.T, args []string, stdin string, host probe.Host, tty bool, exec apply.Executor, editor func(string) error) cli.Env {
+	t.Helper()
+	kd := playbookDir(t)
+	cfgPath, _ := auditConfig(t)
+	envmap := map[string]string{
+		"HAWKEYE_KNOWLEDGE_PATH": kd,
+		"HAWKEYE_CONFIG":         cfgPath,
+	}
+	return cli.Env{
+		Args:   append([]string{"hawkeye", "--config", cfgPath}, args...),
+		Stdin:  bytes.NewBufferString(stdin),
+		Getenv: func(k string) string { return envmap[k] },
+		Host:   host,
+		TTY:    tty,
+		Editor: editor,
+		Exec:   exec,
+	}
+}
+
 func auditConfig(t *testing.T) (cfgPath, auditPath string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -219,10 +238,10 @@ func TestConsult_JSON_NoPromptEvenOnTTY(t *testing.T) {
 
 func TestConsult_TTY_YesThenYesLandsAndAudits(t *testing.T) {
 	ex := &apply.CountingExecutor{}
-	kd := knowledgeDir(t)
+	kd := playbookDir(t)
 	cfgPath, auditPath := auditConfig(t)
 	env := cli.Env{
-		Args:  []string{"hawkeye", "--config", cfgPath, "consult", "hello"},
+		Args:  []string{"hawkeye", "--config", cfgPath, "consult", "ZFS", "root", "is", "read-only", "after", "boot"},
 		Stdin: bytes.NewBufferString("y\ny\n"),
 		Getenv: func(k string) string {
 			switch k {
@@ -245,10 +264,13 @@ func TestConsult_TTY_YesThenYesLandsAndAudits(t *testing.T) {
 	if !strings.Contains(out, "dry-run:") {
 		t.Fatalf("must show dry-run before land: %s", out)
 	}
+	if !strings.Contains(out, `dry-run: zfs set readonly=off "$ROOTDS"`) {
+		t.Fatalf("dry-run must be playbook commands: %s", out)
+	}
 	if !strings.Contains(out, "Apply for real? [y/N]") {
 		t.Fatalf("second confirm: %s", out)
 	}
-	if ex.Calls != 1 {
+	if ex.Calls != len(knowledge.RemountPlaybookCommands()) {
 		t.Fatalf("land calls=%d out=%s", ex.Calls, out)
 	}
 	b, errRead := os.ReadFile(auditPath)
@@ -262,7 +284,7 @@ func TestConsult_TTY_YesThenYesLandsAndAudits(t *testing.T) {
 
 func TestConsult_TTY_YesFlagSkipsSecondConfirmStillRequiresY(t *testing.T) {
 	ex := &apply.CountingExecutor{}
-	env := consultEnv(t, []string{"--yes", "consult", "hello"}, "\n", fakeHost{usr: true, varp: true}, true, ex, nil)
+	env := consultPlaybookEnv(t, []string{"--yes", "consult", "ZFS", "root", "is", "read-only", "after", "boot"}, "\n", fakeHost{usr: true, varp: true}, true, ex, nil)
 	code, out, err := runConsult(t, env)
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
@@ -275,7 +297,7 @@ func TestConsult_TTY_YesFlagSkipsSecondConfirmStillRequiresY(t *testing.T) {
 	}
 
 	ex = &apply.CountingExecutor{}
-	env = consultEnv(t, []string{"--yes", "consult", "hello"}, "y\n", fakeHost{usr: true, varp: true}, true, ex, nil)
+	env = consultPlaybookEnv(t, []string{"--yes", "consult", "ZFS", "root", "is", "read-only", "after", "boot"}, "y\n", fakeHost{usr: true, varp: true}, true, ex, nil)
 	code, out, err = runConsult(t, env)
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
@@ -283,14 +305,14 @@ func TestConsult_TTY_YesFlagSkipsSecondConfirmStillRequiresY(t *testing.T) {
 	if strings.Contains(out, "Apply for real?") {
 		t.Fatalf("--yes should skip second confirm: %s", out)
 	}
-	if ex.Calls != 1 {
-		t.Fatalf("consult --yes + y should land: %d %s", ex.Calls, out)
+	if ex.Calls != len(knowledge.RemountPlaybookCommands()) {
+		t.Fatalf("consult --yes + y should land playbook: %d %s", ex.Calls, out)
 	}
 }
 
 func TestConsult_TTY_DryRunFlagDoesNotLand(t *testing.T) {
 	ex := &apply.CountingExecutor{}
-	env := consultEnv(t, []string{"--dry-run", "--yes", "consult", "hello"}, "y\ny\n", fakeHost{usr: true, varp: true}, true, ex, nil)
+	env := consultPlaybookEnv(t, []string{"--dry-run", "--yes", "consult", "ZFS", "root", "is", "read-only", "after", "boot"}, "y\ny\n", fakeHost{usr: true, varp: true}, true, ex, nil)
 	code, out, err := runConsult(t, env)
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
@@ -298,7 +320,7 @@ func TestConsult_TTY_DryRunFlagDoesNotLand(t *testing.T) {
 	if ex.Calls != 0 {
 		t.Fatalf("--dry-run must win: %d %s", ex.Calls, out)
 	}
-	if !strings.Contains(out, "dry-run:") {
+	if !strings.Contains(out, `dry-run: zfs set readonly=off "$ROOTDS"`) {
 		t.Fatal(out)
 	}
 }

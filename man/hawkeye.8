@@ -143,7 +143,15 @@ On a read-only root the first skill is
 not
 .Cm pkg .
 .It Nm plan Op Ar query
-Propose steps.
+Propose steps from the lead consult playbook
+.Pq stored
+.Cm commands
+JSON or fenced body lines
+.Ns .
+It does not invent
+.Ic echo
+.Ar query
+stubs.
 No mutation.
 Default stdout is operator-readable prose.
 .Fl -json
@@ -151,6 +159,9 @@ or
 .Ev HAWKEYE_JSON
 emits the JSON plan for
 .Nm apply .
+Apply still defaults to dry-run;
+.Fl -yes
+is required to land.
 .It Nm apply Op Fl -dry-run | Fl -yes Op Ar plan.json
 Apply a plan.
 The default is dry-run.

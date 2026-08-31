@@ -24,3 +24,4 @@
 | T015 | TTY consult apply/edit prompt | DONE | cursor/consult-apply-prompt-2ee7 | y/N/e after consult; --json/non-TTY silent; --yes still required to land |
 | T016 | --check-config agrees with doctor on missing config | DONE | cursor-check-config-missing-defaults-762f | native install sample-only |
 | T017 | Bare `hawkeye` operator session (panic path) | DONE | cursor/operator-session-repl-688d | TTY REPL like `ollama run`; compose with T015 apply prompt |
+| T018 | plan from lead playbook stored commands | DONE | cursor/plan-from-playbook-c167 | no echo stub; TTY consult apply uses hits |
