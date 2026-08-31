@@ -15,7 +15,7 @@ chat UI.
 flowchart TD
     Operator["Operator CLI / stdio MCP"] -->|"consult / plan / apply / doctor"| CLI["Controller: cmd/hawkeye + internal/cli"]
     MCPHTTP["MCP Streamable HTTP on 127.0.0.1, bearer token; nginx TLS /mcp"] --> CLI
-    CLI --> Probe["probe: tier 0/1/2"]
+    CLI --> Probe["probe: tier 0/1/2 + host first-look"]
     CLI --> Knowledge["knowledge client: SQLite FTS RO"]
     CLI --> PlanApply["plan + apply gate"]
     CLI --> Doctor["doctor + headroom"]
@@ -76,7 +76,7 @@ flowchart TD
 | `cmd/hawkeye` | Process entry |
 | `internal/cli` | Command dispatcher |
 | `internal/config` | JSON RFC 8259, XDG, `--check-config` |
-| `internal/probe` | Tier classification |
+| `internal/probe` | Tier classification and host first-look (session banner; not doctor) |
 | `internal/knowledge` | SQLite FTS client |
 | `internal/apply` | Plan/apply gate |
 | `internal/doctor` | Service health |

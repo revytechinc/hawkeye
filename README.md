@@ -28,7 +28,8 @@ execs as root.
 
 | Command | What it does |
 |---------|----------------|
-| `hawkeye` | Panic path. On a TTY, type the problem at `>`. Each line is a consult, then `Apply these steps? [y/N/e]`. `quit`/`exit`/`q`/Ctrl-D leave. Non-TTY with no args prints a reminder to run on a terminal. `--json` never enters the session. |
+| `hawkeye` | Panic path. On a TTY, print a host first-look (fstab, rc, zpool, disks, net — not `doctor`), then type the problem at `>`. Each line is a consult, then `Apply these steps? [y/N/e]`. `quit`/`exit`/`q`/Ctrl-D leave. Non-TTY with no args prints a reminder to run on a terminal. `--json` dumps inspect JSON and never enters the session. |
+| `hawkeye inspect` | Host first-look only (same findings as the session banner). Diagnose only. `--json` for the machine object. Not `doctor`. |
 | `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. TTY asks `[y/N/e]` to apply or edit; default N. `--json`, pipes, and MCP do not prompt. Mutation still needs `--yes` or a second y. |
 | `hawkeye plan` | Propose steps from the lead consult playbook (stored commands). No mutation. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the JSON plan. Dry-run default; `--yes` to land via apply. |
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |

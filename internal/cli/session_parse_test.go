@@ -9,7 +9,7 @@ import (
 )
 
 func TestIsKnownCommand(t *testing.T) {
-	for _, c := range []string{"consult", "plan", "apply", "doctor", "mcp", "update", "init", "version", "help"} {
+	for _, c := range []string{"consult", "plan", "apply", "doctor", "inspect", "mcp", "update", "init", "version", "help"} {
 		if !isKnownCommand(c) {
 			t.Fatalf("%q must stay a command", c)
 		}

@@ -689,3 +689,34 @@ total: (statements) 88.7%
 present (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS
 FILES SEE ALSO). apply(8) documents one-shell playbooks, failed-step
 exit, and RO audit degrade.
+
+## 19. Host first-look before session `>` (2026-08-31)
+
+T022: bare TTY `hawkeye` prints host first-look (human text) before `>`.
+Not `doctor` (pidfile/config/knowledge stay service self-health).
+Composed with T021 (A–D apply blockers): failed land still exits 1
+and does not print `applied` or re-inspect.
+
+Red (before `probe.Inspect`):
+
+```
+# github.com/revytechinc/hawkeye/internal/probe_test
+internal/probe/inspect_test.go:21:15: undefined: probe.Inspect
+undefined: probe.Sources
+undefined: probe.DiskUse
+FAIL	github.com/revytechinc/hawkeye/internal/probe [build failed]
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+`probe.Inspect` 100%. `Report.Human` 100%. `Report.JSON` 100%.
+`inspectDisk` 100%. `hostInspect` 100%. Tests use FAKE fixtures only:
+fake fstab+mount table, missing `*_enable` script/binary, RO root,
+full disk + inodes, no carrier, degraded zpool, geli UNAVAIL.
+Healthy fixtures are silent. Human output has no JSON keys and no
+hawkeye pidfile.
+
+Doctor still reports pidfile/config — not host first-look.
+`hawkeye --json inspect` / bare `--json`: structured findings; no REPL.
+Session documents host first-look before `>`.
+`inspect` is diagnose-only and is not `doctor`.

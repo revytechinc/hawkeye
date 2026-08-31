@@ -28,9 +28,25 @@ With no command, on a terminal,
 .Nm
 is the panic path: a short
 .Ql hawkeye
-banner and a
+banner, a host first-look
+.Pq human text, not JSON ,
+then a
 .Ql >
 prompt.
+The first-look inspects the
+.Em host
+immediately: root read-only versus read-write and filesystem type, missing
+.Pa /usr ,
+.Pa /etc/fstab
+versus mounts, zpool health, rc
+.Li *_enable
+versus missing scripts or binaries, network carrier and default route,
+disk and inode headroom, and geli keystatus.
+Each line is one actionable finding.
+Silence means that subsystem looks fine.
+This is not
+.Nm doctor
+.Pq Hawkeye service self-health: config, pidfile, knowledge .
 Type the problem
 .Pq one line .
 Each line is a consult, then
@@ -53,7 +69,7 @@ Without a terminal and with no arguments, print a short reminder to run
 on a terminal
 .Pq do not wait on a pipe .
 .Fl -json
-never enters the session.
+with no command dumps host first-look JSON and never enters the session.
 .Pp
 Knowledge is consumed, never vendored in this repository.
 .Sh INSTALLATION
@@ -73,6 +89,20 @@ install of the data port is not required.
 .It Nm
 With no command, start the panic-path operator session on a terminal.
 This is the intended invocation when the host is on fire.
+The session starts with host first-look, then
+.Ql > .
+.It Nm inspect
+Host first-look only
+.Pq the same findings as the session banner .
+Diagnose only; no mutation.
+Default stdout is human text.
+.Fl -json
+or
+.Ev HAWKEYE_JSON
+emits the structured findings object.
+Does not enter the session.
+Not
+.Nm doctor .
 .It Nm consult Op Ar query
 Diagnose using FTS knowledge and an optional LLM.
 Default stdout is an operator session: the most actionable playbook for
@@ -252,8 +282,10 @@ Must succeed before a SIGHUP reload.
 Prefer JSON output for
 .Nm consult ,
 .Nm plan ,
+.Nm inspect ,
 and
 .Nm doctor .
+With no command, dump host first-look JSON and do not enter the session.
 Consult does not prompt.
 Never starts the panic-path operator session.
 .It Fl -dry-run

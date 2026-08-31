@@ -33,6 +33,9 @@ type Env struct {
 	Stderr io.Writer
 	Getenv func(string) string
 	Host   probe.Host
+	// Sources is the host first-look view. Tests inject FAKE fixtures.
+	// Nil/zero with a live Host uses probe.LiveSources in Run().
+	Sources probe.Sources
 	// TTY is true when stdin is an interactive terminal. Tests set this;
 	// Run() detects it from stdin. Non-TTY, --json, and MCP never prompt.
 	TTY bool
@@ -44,13 +47,14 @@ type Env struct {
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return RunEnv(Env{
-		Args:   args,
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-		Getenv: os.Getenv,
-		Host:   probe.Live(),
-		TTY:    readerIsTTY(stdin),
+		Args:    args,
+		Stdin:   stdin,
+		Stdout:  stdout,
+		Stderr:  stderr,
+		Getenv:  os.Getenv,
+		Host:    probe.Live(),
+		Sources: probe.LiveSources(),
+		TTY:     readerIsTTY(stdin),
 	})
 }
 
@@ -121,6 +125,8 @@ func RunEnv(env Env) int {
 		return cmdApply(env, fs, cfg)
 	case "doctor":
 		return cmdDoctor(env, fs, cfg)
+	case "inspect":
+		return cmdInspect(env, fs)
 	case "mcp":
 		return cmdMCP(env, fs, cfg)
 	case "update":
@@ -214,11 +220,13 @@ func usage() string {
 	return `hawkeye — FreeBSD diagnostic/ops doctor (MASH)
 
 Usage:
-  hawkeye                      Panic-path session on a terminal (type the problem)
+  hawkeye                      Panic-path session on a terminal (host first-look, then >)
   hawkeye [query]              Consult, then stay in the session on a TTY
   hawkeye [--config PATH] [--check-config] [--json] <command> [args]
 
 Commands:
+  inspect             Host first-look (fstab, rc, zpool, disks, net). Diagnose only.
+                      Human text; --json for the machine object. Not doctor.
   consult [query]     Diagnose using knowledge FTS and optional LLM.
                       Human session on stdout; --json or HAWKEYE_JSON=1 for scripts.
                       TTY: Apply these steps? [y/N/e]. Default N.
@@ -387,6 +395,36 @@ func cmdApply(env Env, fs flagset, cfg config.Config) int {
 	return 0
 }
 
+func hostInspect(env Env) probe.Report {
+	return probe.Inspect(env.Host, env.Sources)
+}
+
+func writeFirstLook(env Env) {
+	text := hostInspect(env).Human()
+	if text == "" {
+		return
+	}
+	fmt.Fprint(env.Stdout, text)
+	if !strings.HasSuffix(text, "\n") {
+		fmt.Fprintln(env.Stdout)
+	}
+}
+
+func cmdInspect(env Env, fs flagset) int {
+	rep := hostInspect(env)
+	if wantJSON(fs, env.Getenv) {
+		b, err := rep.JSON()
+		if err != nil {
+			fmt.Fprintln(env.Stderr, err)
+			return 1
+		}
+		_, _ = env.Stdout.Write(append(b, '\n'))
+		return 0
+	}
+	fmt.Fprint(env.Stdout, rep.Human())
+	return 0
+}
+
 func cmdDoctor(env Env, fs flagset, cfg config.Config) int {
 	snap := probe.Probe(env.Host)
 	hr := headroom.Live(snap.GPUPresent)
@@ -482,6 +520,9 @@ func cmdMCP(env Env, fs flagset, cfg config.Config) int {
 			}
 			rep := doctor.Run(doctor.Deps{Cfg: cfg, Probe: snap, Headroom: headroom.Live(snap.GPUPresent), KnowledgeOK: ok, KnowledgeDetail: detail})
 			return rep, nil
+		},
+		Inspect: func() (any, error) {
+			return hostInspect(env), nil
 		},
 	})
 	if fs.http {

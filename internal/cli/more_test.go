@@ -172,4 +172,3 @@ func TestDoctorUnreadablePidfile(t *testing.T) {
 func jsonIndent(c config.Config) ([]byte, error) {
 	return json.MarshalIndent(c, "", "  ")
 }
-

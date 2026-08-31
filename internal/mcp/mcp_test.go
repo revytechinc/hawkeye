@@ -53,7 +53,7 @@ func TestHandle_ToolsListAndApplyDryRun(t *testing.T) {
 	req := mcp.Request{JSONRPC: "2.0", ID: 1, Method: "tools/list"}
 	resp := s.Handle(req)
 	b, _ := json.Marshal(resp.Result)
-	if !strings.Contains(string(b), "apply") || !strings.Contains(string(b), "consult") {
+	if !strings.Contains(string(b), "apply") || !strings.Contains(string(b), "consult") || !strings.Contains(string(b), "inspect") {
 		t.Fatalf("%s", b)
 	}
 	args, _ := json.Marshal(map[string]any{

@@ -22,7 +22,7 @@ const (
 
 func isKnownCommand(s string) bool {
 	switch s {
-	case "help", "version", "init", "consult", "plan", "apply", "doctor", "mcp", "update":
+	case "help", "version", "init", "consult", "plan", "apply", "doctor", "inspect", "mcp", "update":
 		return true
 	}
 	return false
@@ -61,8 +61,7 @@ func cmdSession(env Env, fs flagset, cfg config.Config) int {
 	q := strings.Join(fs.rest, " ")
 	if wantJSON(fs, env.Getenv) {
 		if q == "" {
-			fmt.Fprint(env.Stdout, sessionNeedTTY())
-			return 0
+			return cmdInspect(env, fs)
 		}
 		return runConsultQuery(env, fs, cfg, q, nil)
 	}
@@ -79,6 +78,7 @@ func cmdSession(env Env, fs flagset, cfg config.Config) int {
 func runREPL(env Env, fs flagset, cfg config.Config, first string) int {
 	in := bufio.NewReader(env.Stdin)
 	fmt.Fprintln(env.Stdout, sessionBanner)
+	writeFirstLook(env)
 	if first != "" {
 		fmt.Fprint(env.Stdout, sessionPrompt)
 		fmt.Fprintln(env.Stdout, first)
