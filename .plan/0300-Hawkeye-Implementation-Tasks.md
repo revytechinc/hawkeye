@@ -34,3 +34,4 @@
 | T025 | install-rescue skip RO /boot | DONE | cursor/skip-ro-boot-install-rescue-79b6 | EROFS/EACCES/EPERM skip like /rescue; DESTDIR still creates both |
 | T026 | sqlite-vec / vector search when RAM allows | DONE | cursor/knowledge-sqlite-vec-63f0 | FTS if embeddings empty; local embedder only; no cloud; no GGUF vendored |
 | T027 | install-rescue bmake set -e mkdir | DONE | cursor/bmake-install-rescue-set-e-c3b6 | \|\| _boot_rc so bmake set -e does not abort RO skip; DESTDIR still creates / fails |
+| T028 | rc.d daemon -p pidfile 0644 | DONE | cursor/pidfile-readable-0644-1f09 | seed 0644 before daemon -p; doctor flags 0600; apply dry-run unchanged |

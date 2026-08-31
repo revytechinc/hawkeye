@@ -1060,3 +1060,56 @@ absent ok. Exit 1.
 present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
 SIGNALS FILES SEE ALSO). `hawkeye.conf.5` has NAME DESCRIPTION KEYS
 ENVIRONMENT SEE ALSO. No hawkeye-www.
+
+## 25. Operator-readable daemon pidfile 0644 (2026-08-31)
+
+T028. Live jail/host: unprivileged `hawkeye doctor` was UNHEALTHY because
+`/var/run/hawkeye.pid` was mode `0600` `root:wheel` (permission denied).
+Root doctor was healthy (root can read 0600). PR 7 `start_postcmd` chmod
+races `daemon(8) -p` (`pidfile_open(..., 0600)` when the path is missing,
+or `-f` stays in the foreground so poststart never runs).
+
+Red:
+
+```
+# github.com/revytechinc/hawkeye/internal/pidfile_test
+internal/pidfile/pidfile_test.go:43:14: undefined: pidfile.OperatorReadable
+# github.com/revytechinc/hawkeye/internal/doctor_test
+internal/doctor/doctor_test.go:102:3: unknown field PidMode
+--- FAIL: TestDoctor_Mode0600UnhealthyEvenIfReadable
+    more_test.go:145: 0600 pidfile must be unhealthy so root doctor
+    catches the operator regression
+--- FAIL: TestRcd_DaemonPidfileLeftReadable0644
+    rcd_test.go: rc.d must have hawkeye_pidfile_operator_readable
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply     coverage: 98.0%
+ok  github.com/revytechinc/hawkeye/internal/doctor    coverage: 96.1%
+ok  github.com/revytechinc/hawkeye/internal/pidfile   coverage: 86.4%
+ok  github.com/revytechinc/hawkeye/internal/redact    coverage: 100.0%
+OperatorReadable  100.0%
+Write             100.0%
+Remove            100.0%
+total             89.4%
+```
+
+`TestResolveMode_DefaultIsDryRun` still default dry-run. Apply was not
+changed. rc.d seeds 0644 (`umask 022 && : >`) before `daemon -p` and
+chmods again in poststart. Doctor reports `pidfile is not world-readable
+(mode 0600)` when root can read a 0600 file. 0644 + knowledge is healthy.
+Unreadable (permission denied) is still `unreadable`, not `empty`.
+
+`--check-config` (no file): exit 0, defaults.
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing, pidfile
+not required, GPU absent ok. Exit 1.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO; Xr daemon 8). `hawkeye.conf.5` has NAME
+DESCRIPTION KEYS ENVIRONMENT SEE ALSO. No hawkeye-www.

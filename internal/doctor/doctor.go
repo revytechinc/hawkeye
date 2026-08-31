@@ -6,11 +6,13 @@ package doctor
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/revytechinc/hawkeye/internal/config"
 	"github.com/revytechinc/hawkeye/internal/headroom"
+	"github.com/revytechinc/hawkeye/internal/pidfile"
 	"github.com/revytechinc/hawkeye/internal/probe"
 )
 
@@ -36,6 +38,7 @@ type Deps struct {
 	PidContent      string
 	PidReadErr      string
 	PidOwnerOK      bool
+	PidMode         int
 	ConfigMode      int
 	KnowledgeOK     bool
 	KnowledgeDetail string
@@ -72,6 +75,9 @@ func Run(d Deps) Report {
 	if d.PidReadErr != "" {
 		pidOK = false
 		pidDetail = d.PidReadErr
+	} else if d.PidMode != 0 && !pidfile.OperatorReadable(os.FileMode(d.PidMode)) {
+		pidOK = false
+		pidDetail = fmt.Sprintf("pidfile is not world-readable (mode %04o); operator doctor cannot read it", d.PidMode)
 	} else if d.PidRunning {
 		pidDetail = "pidfile present"
 		s := strings.TrimSpace(d.PidContent)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/revytechinc/hawkeye/internal/cli"
 	"github.com/revytechinc/hawkeye/internal/config"
+	"github.com/revytechinc/hawkeye/internal/knowledge"
 )
 
 func TestApplyEmptyAndBadJSON(t *testing.T) {
@@ -124,6 +125,78 @@ func TestRunWrapper(t *testing.T) {
 	if code != 0 {
 		t.Fatal(code, errb.String())
 	}
+}
+
+func TestDoctor_Mode0600UnhealthyEvenIfReadable(t *testing.T) {
+	dir := t.TempDir()
+	pidp := filepath.Join(dir, "hawkeye.pid")
+	if err := os.WriteFile(pidp, []byte("12345\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfgp := doctorConfigWithPid(t, dir, pidp)
+	if err := knowledge.CreateTestDB(filepath.Join(dir, "knowledge.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	code, out, _ := run(t, []string{"--config", cfgp, "doctor", "--json"}, "", fakeHost{usr: true, varp: true}, map[string]string{
+		"HAWKEYE_KNOWLEDGE_PATH": dir,
+		"HAWKEYE_CONFIG":         cfgp,
+	})
+	if code == 0 {
+		t.Fatal("0600 pidfile must be unhealthy so root doctor catches the operator regression")
+	}
+	if strings.Contains(out, "pidfile is empty") {
+		t.Fatalf("0600 reported as empty: %s", out)
+	}
+	if !strings.Contains(out, "0600") && !strings.Contains(out, "world-readable") && !strings.Contains(out, "unreadable") {
+		t.Fatalf("want 0600/world-readable: %s", out)
+	}
+}
+
+func TestDoctor_Readable0644NotPermissionDenied(t *testing.T) {
+	dir := t.TempDir()
+	pidp := filepath.Join(dir, "hawkeye.pid")
+	if err := os.WriteFile(pidp, []byte("12345\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfgp := doctorConfigWithPid(t, dir, pidp)
+	if err := knowledge.CreateTestDB(filepath.Join(dir, "knowledge.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	code, out, err := run(t, []string{"--config", cfgp, "doctor", "--json"}, "", fakeHost{usr: true, varp: true}, map[string]string{
+		"HAWKEYE_KNOWLEDGE_PATH": dir,
+		"HAWKEYE_CONFIG":         cfgp,
+	})
+	if strings.Contains(out, "permission denied") || strings.Contains(out, "unreadable") {
+		t.Fatalf("0644 must not be permission denied: %s", out)
+	}
+	if code != 0 {
+		t.Fatalf("0644 pidfile + knowledge must be healthy: code=%d out=%s err=%s", code, out, err)
+	}
+	if !strings.Contains(out, `"healthy": true`) && !strings.Contains(out, `"healthy":true`) {
+		t.Fatalf("want healthy JSON: %s", out)
+	}
+}
+
+func doctorConfigWithPid(t *testing.T, dir, pidp string) string {
+	t.Helper()
+	b, err := config.InitJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Parse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.PidFile = pidp
+	raw, err := jsonIndent(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfgp := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(cfgp, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return cfgp
 }
 
 func TestDoctorUnreadablePidfile(t *testing.T) {
