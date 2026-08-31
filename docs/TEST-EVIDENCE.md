@@ -330,3 +330,38 @@ llm skipped: local llm model is not configured
 
 `CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
 
+## 12. Consult TTY lead playbook (2026-08-31)
+
+T014: default `hawkeye consult` leads with the most actionable playbook (title,
+stored when-to-use, stored commands), then related titles under `also:`.
+No query/tier keys, no Rank, no Tags-as-JSON, no `llm skipped`.
+`--json` keeps the FTS machine object (remount may stay 4th).
+
+Red: Human() still printed `consult  …`, `tier N`, `llm skipped`, and listed
+hits in FTS order (`1. List, activate…` before remount).
+
+Green: `go test ./internal/... ./cmd/hawkeye -count=1` PASS.
+
+Fixture kit (playbooks_fts; query `ZFS root is read-only after boot`):
+
+```
+$ hawkeye consult 'ZFS root is read-only after boot'
+Remount ZFS root read-write
+  Root is a ZFS dataset and is mounted read-only (single-user, panic
+  remount, zfs readonly=on, or a readonly pool import).
+
+  export PATH=/rescue:/sbin:/bin:/usr/sbin:/usr/bin
+  mount -p
+  zfs set readonly=off "$ROOTDS"
+  mount -u -o rw /
+
+also:
+  List, activate, or roll back a ZFS boot environment
+  Import a ZFS pool (readonly first, then unlock)
+```
+
+`--json` still dumps `"query"` / `"hits"` with original FTS order.
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye doctor`: UNHEALTHY (knowledge missing), GPU absent ok.
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+
