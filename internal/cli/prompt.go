@@ -239,11 +239,10 @@ func editPlan(env Env, plan apply.Plan) (apply.Plan, bool) {
 	_ = f.Close()
 	defer func() { _ = os.Remove(name) }()
 
-	raw, err := json.MarshalIndent(plan, "", "  ")
+	raw, err := json.MarshalIndent(redactPlan(plan), "", "  ")
 	if err != nil {
 		return apply.Plan{}, false
 	}
-	raw = []byte(redact.String(string(raw)))
 	if err := os.WriteFile(name, raw, 0o600); err != nil {
 		return apply.Plan{}, false
 	}
@@ -262,9 +261,29 @@ func editPlan(env Env, plan apply.Plan) (apply.Plan, bool) {
 	return parseEditedPlan(got, plan)
 }
 
+func redactPlan(p apply.Plan) apply.Plan {
+	p.ID = redact.String(p.ID)
+	p.Source = redact.String(p.Source)
+	p.Summary = redact.String(p.Summary)
+	steps := make([]apply.Step, len(p.Steps))
+	for i, s := range p.Steps {
+		s.ID = redact.String(s.ID)
+		s.Action = redact.String(s.Action)
+		if len(s.Argv) > 0 {
+			argv := make([]string, len(s.Argv))
+			for j, a := range s.Argv {
+				argv[j] = redact.String(a)
+			}
+			s.Argv = argv
+		}
+		steps[i] = s
+	}
+	p.Steps = steps
+	return p
+}
+
 func parseEditedPlan(raw []byte, fallback apply.Plan) (apply.Plan, bool) {
-	s := redact.String(string(raw))
-	s = strings.TrimSpace(s)
+	s := strings.TrimSpace(string(raw))
 	if s == "" {
 		return apply.Plan{}, false
 	}
@@ -276,8 +295,7 @@ func parseEditedPlan(raw []byte, fallback apply.Plan) (apply.Plan, bool) {
 		if len(p.Steps) == 0 {
 			return apply.Plan{}, false
 		}
-		p.Summary = redact.String(p.Summary)
-		return p, true
+		return redactPlan(p), true
 	}
 	p := fallback
 	p.Steps = nil
@@ -287,7 +305,7 @@ func parseEditedPlan(raw []byte, fallback apply.Plan) (apply.Plan, bool) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		fields := strings.Fields(line)
+		fields := strings.Fields(redact.String(line))
 		if len(fields) == 0 {
 			continue
 		}
@@ -302,5 +320,5 @@ func parseEditedPlan(raw []byte, fallback apply.Plan) (apply.Plan, bool) {
 	if len(p.Steps) == 0 {
 		return apply.Plan{}, false
 	}
-	return p, true
+	return redactPlan(p), true
 }

@@ -5,6 +5,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -107,6 +108,26 @@ func TestParseEditedPlan_JSONAndCommands(t *testing.T) {
 	}
 	if _, ok = parseEditedPlan([]byte(`{"id":"x","steps":[]}`), orig); ok {
 		t.Fatal("empty steps must abort")
+	}
+}
+
+func TestRedactPlan_KeepsJSONValid(t *testing.T) {
+	p := apply.Plan{
+		ID: "p", Source: "operator",
+		Summary: "password=fake-password-for-tests-only",
+		Steps:   []apply.Step{{ID: "1", Action: "echo", Argv: []string{"echo", "x"}}},
+	}
+	got := redactPlan(p)
+	if strings.Contains(got.Summary, "fake-password-for-tests-only") {
+		t.Fatal(got.Summary)
+	}
+	b, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var round apply.Plan
+	if err := json.Unmarshal(b, &round); err != nil {
+		t.Fatal(err)
 	}
 }
 
