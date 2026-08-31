@@ -46,15 +46,16 @@ type Completer interface {
 // preferred; otherwise the job stays on CPU. Missing GPU does not block
 // CPU jobs. Consumption-based headroom still uses Allow().
 type Local struct {
-	Backend    string
-	Bin        string
-	ModelPath  string
-	PreferGPU  bool
-	RequireGPU bool
-	GPUPresent bool
-	Headroom   headroom.Snapshot
-	RAMMin     *int64
-	VRAMMin    *int64
+	Backend        string
+	Bin            string
+	ModelPath      string
+	EmbedModelPath string
+	PreferGPU      bool
+	RequireGPU     bool
+	GPUPresent     bool
+	Headroom       headroom.Snapshot
+	RAMMin         *int64
+	VRAMMin        *int64
 	// Run, if set, replaces exec (tests). Production uses the configured Bin.
 	Run func(ctx context.Context, argv []string) (string, error)
 }

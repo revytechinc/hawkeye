@@ -161,7 +161,9 @@ Does not enter the session.
 Not
 .Nm doctor .
 .It Nm consult Op Ar query
-Diagnose using FTS knowledge and an optional LLM.
+Diagnose using FTS knowledge, optional sqlite-vec rank when
+.Va embeddings
+rows exist and RAM allows, and an optional LLM.
 Default stdout is an operator session: the most actionable playbook for
 the query
 .Pq title, stored summary, stored commands ,
@@ -172,8 +174,11 @@ It does not print query or tier keys, ranks, or an
 .Dq llm skipped
 line
 .Pq no model is a quiet TTY skip;
+empty
+.Va embeddings
+is FTS-only with no vector chrome;
 .Fl -json
-may still note it
+may still note an LLM skip
 .Ns .
 .Fl -json
 or

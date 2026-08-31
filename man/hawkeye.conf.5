@@ -106,6 +106,20 @@ Empty means LLM is optional
 .Ns .
 Override with
 .Ev HAWKEYE_LLM_MODEL .
+.It Va llm.local.embed_model_path
+Path to a local embedding GGUF.
+Empty means consult stays FTS-only and does not write
+.Va embeddings
+rows.
+No cloud embed API.
+Override with
+.Ev HAWKEYE_EMBED_MODEL .
+When set and free RAM is above
+.Va resources.ram_min_free_bytes ,
+consult may rank existing
+.Va embeddings
+FLOAT32 blobs with sqlite-vec.
+Missing GPU uses CPU.
 .It Va llm.local.prefer_gpu
 Try GPU then CPU.
 .It Va llm.local.require_gpu
@@ -184,6 +198,12 @@ Overrides
 .It Ev HAWKEYE_LLM_API_KEY
 Remote LLM API key
 .Pq never placed in the JSON file .
+.It Ev HAWKEYE_EMBED_MODEL
+Local embedding GGUF path.
+Empty keeps
+.Va embeddings
+empty and consult FTS-only.
+Never a cloud endpoint.
 .It Ev HAWKEYE_MCP_TOKEN
 Bearer token for Streamable HTTP MCP.
 Required for

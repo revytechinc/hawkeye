@@ -2,7 +2,7 @@
 
 **Document ID:** HAWKEYE-ARCH
 **Version:** 0.1.0
-**Last Updated:** 2026-08-30
+**Last Updated:** 2026-08-31
 **Status:** ACTIVE
 
 This repository ships the Hawkeye **binary**. Knowledge lives in
@@ -16,7 +16,7 @@ flowchart TD
     Operator["Operator CLI / stdio MCP"] -->|"consult / plan / apply / doctor"| CLI["Controller: cmd/hawkeye + internal/cli"]
     MCPHTTP["MCP Streamable HTTP on 127.0.0.1, bearer token; nginx TLS /mcp"] --> CLI
     CLI --> Probe["probe: tier 0/1/2 + host first-look"]
-    CLI --> Knowledge["knowledge client: SQLite FTS RO"]
+    CLI --> Knowledge["knowledge client: SQLite FTS RO + sqlite-vec"]
     CLI --> PlanApply["plan + apply gate"]
     CLI --> Doctor["doctor + headroom"]
     CLI --> LLM["llm: llama-cli/llama.cpp local GGUF; GPU then CPU"]
@@ -59,6 +59,19 @@ flowchart LR
 Open is always read-only for consult. When the root is read-only, the DSN uses
 `mode=ro` and `immutable=1` so SQLite will not try to create `-wal`/`-shm` files.
 
+```mermaid
+flowchart TD
+    Q["consult query"] --> FTS["FTS5"]
+    FTS --> Ready{"embeddings rows and RAM and local embedder?"}
+    Ready -->|no| FTSOnly["FTS order; quiet TTY"]
+    Ready -->|yes| Vec["sqlite-vec cosine on FLOAT32 blobs"]
+    Vec --> RRF["RRF merge"]
+```
+
+The shipped kit may have zero `embeddings` rows. That is valid. A local
+embedder fills existing playbook/document chunks only on a writable handle
+(`OpenRW`). Consult never writes. No cloud embed API. No GGUF is vendored.
+
 ## Tiers
 
 ```mermaid
@@ -78,7 +91,7 @@ flowchart TD
 | `internal/cli` | Command dispatcher |
 | `internal/config` | JSON RFC 8259, XDG, `--check-config` |
 | `internal/probe` | Tier classification and host first-look (session banner; not doctor) |
-| `internal/knowledge` | SQLite FTS client |
+| `internal/knowledge` | SQLite FTS client + sqlite-vec rank |
 | `internal/apply` | Plan/apply gate |
 | `internal/doctor` | Service health |
 | `internal/headroom` | Consumption-based resources |

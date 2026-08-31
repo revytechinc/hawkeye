@@ -108,12 +108,17 @@ func TestApplyEnv_LLMAndUpdate(t *testing.T) {
 	if c.Update.Source != "" {
 		t.Fatal("update source must default empty so rc start skips")
 	}
+	if c.LLM.Local.EmbedModelPath != "" {
+		t.Fatal("embed model must default empty (FTS-only, no vendored GGUF)")
+	}
 	got := config.ApplyEnv(c, func(k string) string {
 		switch k {
 		case "HAWKEYE_LLM_MODEL":
 			return "/models/fake.gguf"
 		case "HAWKEYE_LLM_BIN":
 			return "/usr/local/bin/llama-cli"
+		case "HAWKEYE_EMBED_MODEL":
+			return "/models/fake-embed.gguf"
 		case "HAWKEYE_UPDATE_SOURCE":
 			return "/var/cache/hawkeye-data/knowledge.sqlite"
 		default:
@@ -125,6 +130,9 @@ func TestApplyEnv_LLMAndUpdate(t *testing.T) {
 	}
 	if got.LLM.Local.Bin != "/usr/local/bin/llama-cli" {
 		t.Fatal(got.LLM.Local.Bin)
+	}
+	if got.LLM.Local.EmbedModelPath != "/models/fake-embed.gguf" {
+		t.Fatal(got.LLM.Local.EmbedModelPath)
 	}
 	if got.Update.Source != "/var/cache/hawkeye-data/knowledge.sqlite" {
 		t.Fatal(got.Update.Source)

@@ -14,7 +14,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/revytechinc/hawkeye/internal/headroom"
+
 	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite/vec"
 )
 
 var ErrNotFound = errors.New("knowledge database not found")
@@ -38,10 +41,19 @@ type Store struct {
 	Immutable bool
 	ReadOnly  bool
 	FTS       bool
+	Vec       bool
 	DB        *sql.DB
 	legacyFTS bool
 	docsFTS   bool
 	playFTS   bool
+	hasEmb    bool
+
+	// Search options. Consult is diagnose-only and stays read-only.
+	// QueryVec (tests) or Embedder + RAM headroom enable sqlite-vec rank.
+	Embedder Embedder
+	QueryVec []float32
+	Headroom headroom.Snapshot
+	RAMMin   *int64
 }
 
 type Hit struct {
@@ -106,6 +118,7 @@ func Open(paths []string, rootRO bool) (*Store, error) {
 			continue
 		}
 		st.FTS = true
+		st.probeVectors()
 		return st, nil
 	}
 	if last == nil {
@@ -177,10 +190,25 @@ func (s *Store) Search(query string, limit int) ([]Hit, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-	match := ftsMatchQuery(query)
-	if match == "" {
-		match = strings.TrimSpace(query)
+	ftsHits, err := s.searchFTS(query, limit)
+	if err != nil {
+		return nil, err
 	}
+	vecHits, ok := s.searchVectors(query, limit)
+	if !ok || len(vecHits) == 0 {
+		return ftsHits, nil
+	}
+	if len(ftsHits) == 0 {
+		s.attachCommands(vecHits)
+		return vecHits, nil
+	}
+	merged := mergeHits(ftsHits, vecHits, limit)
+	s.attachCommands(merged)
+	return merged, nil
+}
+
+func (s *Store) searchFTS(query string, limit int) ([]Hit, error) {
+	match := ftsMatchQuery(query)
 	if match == "" {
 		return nil, nil
 	}
@@ -366,6 +394,7 @@ func CreatePlaybookTestDB(path string) error {
 			title, category, body,
 			content='documents', content_rowid='rowid', tokenize='unicode61'
 		)`,
+		embeddingsDDL,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

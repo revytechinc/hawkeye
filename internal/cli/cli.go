@@ -228,7 +228,7 @@ Usage:
 Commands:
   inspect             Host first-look (fstab, rc, zpool, disks, net). Diagnose only.
                       Human text; --json for the machine object. Not doctor.
-  consult [query]     Diagnose using knowledge FTS and optional LLM.
+  consult [query]     Diagnose using knowledge FTS, optional sqlite-vec, optional LLM.
                       Human session on stdout; --json or HAWKEYE_JSON=1 for scripts.
                       TTY: Apply these steps? [y/N/e]. Default N.
                       Landing still needs --yes or a second y. No prompt
@@ -294,7 +294,31 @@ func openKnowledge(env Env, cfg config.Config, snap probe.Snapshot) *knowledge.S
 	if err != nil {
 		return nil
 	}
+	attachSearch(st, cfg, snap)
 	return st
+}
+
+func attachSearch(st *knowledge.Store, cfg config.Config, snap probe.Snapshot) {
+	if st == nil {
+		return
+	}
+	hr := headroom.Live(snap.GPUPresent)
+	st.Headroom = hr
+	st.RAMMin = cfg.Resources.RAMMinFreeBytes
+	if strings.TrimSpace(cfg.LLM.Local.EmbedModelPath) == "" {
+		return
+	}
+	st.Embedder = llm.Local{
+		Backend:        cfg.LLM.Local.Backend,
+		Bin:            cfg.LLM.Local.Bin,
+		EmbedModelPath: cfg.LLM.Local.EmbedModelPath,
+		PreferGPU:      cfg.LLM.Local.PreferGPU,
+		RequireGPU:     false,
+		GPUPresent:     snap.GPUPresent,
+		Headroom:       hr,
+		RAMMin:         cfg.Resources.RAMMinFreeBytes,
+		VRAMMin:        cfg.Resources.GPUVRAMMinFreeBytes,
+	}
 }
 
 func cmdConsult(env Env, fs flagset, cfg config.Config) int {

@@ -17,6 +17,7 @@
       "backend": "llama.cpp",
       "bin": "",
       "model_path": "",
+      "embed_model_path": "",
       "prefer_gpu": true,
       "require_gpu": false
     },

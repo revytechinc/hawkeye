@@ -29,6 +29,7 @@
 | T020 | MCP apply uses CLI SysExecutor + auditor | DONE | cursor/pkg-reviewer-blockers-2150 | unprivileged+yes must exec; privileged stays dry-run |
 | T021 | Panic-path apply: shell env, fail≠applied, RO audit, redact-after-parse | DONE | cursor/panic-path-apply-blockers-2072 | ROOTDS persists; step fail exits 1; audit degrades on RO /var; plan JSON parsed then redacted |
 | T022 | Host first-look before session `>` | DONE | cursor/host-first-look-session-b2ff | panic path inspects HOST (fstab/rc/zpool/net/disk); not doctor; compose with T021 |
-| T023 | inspect expands rc.subr `${name}` in command= | IN PROGRESS | cursor/inspect-rc-name-expand-c049 | live jail false-positive sshd missing; isolate plan tests from live kit |
+| T023 | inspect expands rc.subr `${name}` in command= | DONE | cursor/inspect-rc-name-expand-c049 | live jail false-positive sshd missing; isolate plan tests from live kit |
 | T024 | Rescue layout install | DONE | cursor/core-llm-update-rescue-d1e7 | make install-rescue; port RESCUE; /rescue + /boot/hawkeye |
 | T025 | install-rescue skip RO /boot | DONE | cursor/skip-ro-boot-install-rescue-79b6 | EROFS/EACCES/EPERM skip like /rescue; DESTDIR still creates both |
+| T026 | sqlite-vec / vector search when RAM allows | DONE | cursor/knowledge-sqlite-vec-63f0 | FTS if embeddings empty; local embedder only; no cloud; no GGUF vendored |
