@@ -178,23 +178,45 @@ func TestApplyAuditor_MkdirFail(t *testing.T) {
 	if err := os.WriteFile(notdir, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := applyAuditor(config.Config{AuditLog: filepath.Join(notdir, "audit.log")}, apply.ModeApply)
-	if err == nil {
-		t.Fatal("expected mkdir fail on apply")
+	var warn strings.Builder
+	a, err := applyAuditor(config.Config{AuditLog: filepath.Join(notdir, "audit.log")}, apply.ModeApply, &warn)
+	if err != nil {
+		t.Fatal("ModeApply must degrade when audit dir cannot be created, not refuse the land")
 	}
-	a, err := applyAuditor(config.Config{AuditLog: filepath.Join(notdir, "audit.log")}, apply.ModeDryRun)
+	if _, ok := a.(apply.NopAuditor); !ok {
+		t.Fatalf("%T", a)
+	}
+	if !strings.Contains(warn.String(), "audit") {
+		t.Fatalf("want stderr note: %s", warn.String())
+	}
+	a, err = applyAuditor(config.Config{AuditLog: filepath.Join(notdir, "audit.log")}, apply.ModeDryRun, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := a.(apply.NopAuditor); !ok {
 		t.Fatalf("%T", a)
 	}
-	a, err = applyAuditor(config.Config{}, apply.ModeApply)
+	a, err = applyAuditor(config.Config{}, apply.ModeApply, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := a.(apply.NopAuditor); !ok {
 		t.Fatalf("%T", a)
+	}
+	blocked := filepath.Join(t.TempDir(), "audit.log")
+	if err := os.MkdirAll(blocked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var warn2 strings.Builder
+	a, err = applyAuditor(config.Config{AuditLog: blocked}, apply.ModeApply, &warn2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a.(apply.NopAuditor); !ok {
+		t.Fatalf("unwritable audit file must degrade: %T", a)
+	}
+	if !strings.Contains(warn2.String(), "audit") {
+		t.Fatal(warn2.String())
 	}
 }
 
@@ -250,12 +272,35 @@ func TestPrintApply_AuditorFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out, errb strings.Builder
-	code := printApply(Env{Stdout: &out, Stderr: &errb, Exec: &apply.CountingExecutor{}}, config.Config{AuditLog: filepath.Join(notdir, "audit.log")}, apply.Plan{ID: "p"}, apply.ModeApply)
-	if code == 0 {
-		t.Fatal("expected audit mkdir failure")
+	code := printApply(Env{Stdout: &out, Stderr: &errb, Exec: &apply.CountingExecutor{}}, config.Config{AuditLog: filepath.Join(notdir, "audit.log")}, apply.Plan{ID: "p", Steps: []apply.Step{{ID: "1", Argv: []string{"echo", "ok"}}}}, apply.ModeApply)
+	if code != 0 {
+		t.Fatalf("unwritable audit must not block land: %d %s", code, errb.String())
 	}
-	if !strings.Contains(errb.String(), "audit log") {
+	if !strings.Contains(errb.String(), "audit") {
 		t.Fatal(errb.String())
+	}
+	if !strings.Contains(out.String(), "applied") {
+		t.Fatal(out.String())
+	}
+}
+
+func TestPrintApply_ROMissingVarStillLands(t *testing.T) {
+	ro := t.TempDir()
+	if err := os.Chmod(ro, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
+	auditLog := filepath.Join(ro, "var", "log", "hawkeye", "audit.log")
+	var out, errb strings.Builder
+	code := printApply(Env{Stdout: &out, Stderr: &errb, Exec: &apply.CountingExecutor{}}, config.Config{AuditLog: auditLog}, apply.Plan{ID: "unlock-rw", Steps: []apply.Step{{ID: "1", Action: "unlock-rw", Argv: []string{"echo", "ok"}}}}, apply.ModeApply)
+	if code != 0 {
+		t.Fatalf("RO missing /var must still land: %d %s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "applied") {
+		t.Fatal(out.String())
+	}
+	if !strings.Contains(errb.String(), "audit") {
+		t.Fatalf("want stderr note: %s", errb.String())
 	}
 }
 
@@ -266,10 +311,33 @@ func TestPrintApply_StepError(t *testing.T) {
 		Stderr: &errb,
 		Exec:   failExec{},
 	}, config.Config{}, apply.Plan{ID: "p", Steps: []apply.Step{{ID: "1", Argv: []string{"nope"}}}}, apply.ModeApply)
-	if code != 0 {
-		t.Fatalf("step error is recorded, not fatal: %d %s", code, errb.String())
+	if code == 0 {
+		t.Fatal("step failure must be non-zero")
 	}
-	if !strings.Contains(out.String(), "boom") {
+	if strings.Contains(out.String(), "applied") {
+		t.Fatalf("TTY must not claim applied: %s", out.String())
+	}
+	if !strings.Contains(out.String(), "boom") && !strings.Contains(errb.String(), "boom") {
+		t.Fatalf("%s %s", out.String(), errb.String())
+	}
+}
+
+func TestPrintApply_ShellEnvPersists(t *testing.T) {
+	ex := &apply.SysExecutor{}
+	t.Cleanup(func() { _ = ex.Close() })
+	var out, errb strings.Builder
+	plan := apply.Plan{ID: "p", Steps: []apply.Step{
+		{ID: "1", Argv: []string{"ROOTDS=/export/hawkeye-rootds-fixture"}},
+		{ID: "2", Argv: []string{`printf '%s\n' "$ROOTDS"`}},
+	}}
+	code := printApply(Env{Stdout: &out, Stderr: &errb, Exec: ex}, config.Config{}, plan, apply.ModeApply)
+	if code != 0 {
+		t.Fatalf("%d %s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "/export/hawkeye-rootds-fixture") {
+		t.Fatalf("ROOTDS must persist; CountingExecutor is not this test: %s", out.String())
+	}
+	if !strings.Contains(out.String(), "applied") {
 		t.Fatal(out.String())
 	}
 }

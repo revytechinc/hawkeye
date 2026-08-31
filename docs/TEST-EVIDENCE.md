@@ -609,3 +609,83 @@ has carrier (getifaddrs fallback; not stuck at 1 by missing `/sys`).
 `mandoc` not installed here. Equivalent mdoc lint: required macros
 present (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS
 FILES SEE ALSO). Tier 2 documents getifaddrs / SIOCGIFMEDIA / ifconfig.
+
+## 18. Panic-path apply blockers (2026-08-31)
+
+T021. Claude Reviewer blocked pkg again after PR 16 (`3553f99`). Four
+panic/rescue land bugs. Dry-run / `--yes` gates unchanged. PR 16 FreeBSD
+carrier and real MCP apply executor kept.
+
+### A. Playbook shell session (ROOTDS)
+
+`stepsFromCommands` still emits one step per stored line
+(`Argv []string{line}`). `SysExecutor` now keeps one `/bin/sh` session
+so `ROOTDS=/export/...` is visible to a later `printf '%s\n' "$ROOTDS"`.
+`TestSysExecutor_PersistsShellEnvAcrossSteps` and
+`TestPrintApply_ShellEnvPersists` use a real executor, not
+`CountingExecutor` (which returns `ok` and never evaluates the
+assignment). Panic-path y/y can remount ZFS RO root.
+
+### B. Failed land is not success
+
+`apply.Execute` sets `Applied=false` and returns `ErrStepFailed` when any
+step fails. `hawkeye apply` still prints the result JSON and exits
+non-zero. TTY `printApply` does not print `applied`.
+`TestExecute_AnyStepFailureIsNotApplied`,
+`TestApply_StepFailureExitsNonZero`,
+`TestConsult_TTY_FailedLandDoesNotClaimApplied`.
+
+### C. RO missing /var must still land
+
+`applyAuditor` ModeApply no longer refuses when `MkdirAll` of the audit
+dir fails (default `/var/log/hawkeye/audit.log`). It degrades to
+`NopAuditor` with a stderr note. Dry-run already did this.
+`TestApply_ROMissingVarStillLands`,
+`TestPrintApply_ROMissingVarStillLands`.
+
+### D. File apply redacts after parse
+
+`hawkeye apply plan.json` `json.Unmarshal`s first, then `redactPlan` by
+field. A compact plan with `password: fake-password-for-tests-only` still
+unmarshals. TTY consult was already field-safe.
+`TestApply_PasswordKVStillUnmarshals` (FAKE fixture only).
+
+Red (before the fix):
+
+```
+# apply.SysExecutor{}.Close undefined; applyAuditor arity
+# TestSysExecutor_PersistsShellEnvAcrossSteps would fail:
+#   ROOTDS gone after per-step /bin/sh -c
+# TestExecute_StepErrorRecorded: Applied=true, err=nil
+# TestApply_PasswordKVStillUnmarshals: plan JSON: unexpected end / invalid
+# TestApplyAuditor_MkdirFail: ModeApply returned error (blocked land)
+# TestPrintApply_StepError: code=0 and "applied"
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply      coverage: 98.0%
+ok  github.com/revytechinc/hawkeye/internal/cli        coverage: 84.3%
+ok  github.com/revytechinc/hawkeye/internal/consult    coverage: 96.8%
+ok  github.com/revytechinc/hawkeye/internal/redact     coverage: 100.0%
+ok  github.com/revytechinc/hawkeye/internal/probe      coverage: 91.7%
+total: (statements) 88.7%
+```
+
+`apply.Execute` 100%. `apply.ResolveMode` 100%. `runShellLine` 100%.
+`applyAuditor` 100%. `redactPlan` 100%. `mcpApply` 100%.
+`consult.CommandLines` 100%. Redact 100%. FAKE fixtures only.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye apply` without `--yes`: `"dry_run": true`, `"applied": false`.
+`hawkeye apply --dry-run --yes`: `"dry_run": true` (`--dry-run` wins).
+`hawkeye --json doctor` (no kit): UNHEALTHY, GPU absent ok. Exit 1.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS
+FILES SEE ALSO). apply(8) documents one-shell playbooks, failed-step
+exit, and RO audit degrade.

@@ -168,7 +168,21 @@ The default is dry-run.
 .Fl -yes
 is required to mutate.
 LLM actors never execute privileged steps; the operator CLI is the mutator.
+Playbook command lists run in one
+.Pa /bin/sh
+session so assignments such as
+.Li ROOTDS=
+persist into later
+.Li zfs set \&"$ROOTDS\&"
+steps.
+A failed step does not report applied and exits non-zero.
+Plan JSON is parsed first; secrets are redacted per field, not against the raw document.
 Applies are audited.
+If the audit log directory cannot be created
+.Pq read-only root, missing
+.Pa /var
+.Ns ,
+apply still lands and notes the skip on stderr.
 .It Nm doctor
 Service health: configuration, permissions, pidfile, dependencies, and
 resource headroom.
