@@ -117,21 +117,30 @@ Set
 to copy a sqlite file into the rescue kit.
 On a live host,
 .Pa /rescue
-is written only when it is a real directory.
+that is a real directory, or a symlink to a writable rescue image
+full of FreeBSD tools, is installed
+.Em into
+.Pq the existing tools are not replaced or emptied
+.Ns .
 A dangling bastille
 .Pa /rescue
 symlink
 .Pq thin jail
-is skipped.
+is replaced with a real directory so
+.Pa /rescue/hawkeye
+is a runnable binary.
 .Pa /boot/hawkeye
 is created when
 .Pa /boot
 exists and is writable.
 A read-only
-.Pa /boot
-.Pq bastille symlink to a release boot; EROFS, EACCES, or EPERM
-is skipped the same way as a dangling
 .Pa /rescue
+or
+.Pa /boot
+.Pq EROFS, EACCES, or EPERM
+is skipped
+.Pq
+.Li install-rescue: skip ... (read-only)
 .Ns .
 The install does not remount
 .Pa /boot
@@ -168,8 +177,8 @@ Default stdout is an operator session: the most actionable playbook for
 the query
 .Pq title, stored summary, stored commands ,
 then related titles.
-When a local model runs, the completion is printed after the playbook
-hits.
+When a local GGUF is configured or discovered under the well-known
+model dirs, the completion is printed after the playbook hits.
 It does not print query or tier keys, ranks, or an
 .Dq llm skipped
 line
@@ -319,6 +328,24 @@ gate
 Privileged MCP apply stays dry-run even when
 .Cm yes
 is set.
+.It Nm embed Op Fl -dry-run | Fl -yes Op Fl -dest Ar path
+Fill
+.Va embeddings
+rows in a writable copy of the knowledge kit using the local embedder.
+Consult stays read-only.
+The default is dry-run
+.Pq no write
+.Ns .
+.Fl -yes
+is required to write.
+A read-only store is refused.
+Destination is
+.Fl -dest ,
+a path argument, or
+.Ev HAWKEYE_KNOWLEDGE_PATH
+.Ns .
+No cloud embed API.
+Secrets are redacted and never printed.
 .It Nm update
 Refresh knowledge artifacts from
 .Nm hawkeye-data
@@ -381,11 +408,14 @@ Force apply dry-run
 Wins over
 .Fl -yes
 on
-.Nm apply
+.Nm apply ,
+.Nm embed ,
 and on a TTY consult confirm.
 .It Fl -yes
 Permit mutation for
-.Nm apply .
+.Nm apply
+and
+.Nm embed .
 On a TTY
 .Nm consult ,
 skips the second
@@ -474,6 +504,14 @@ and playbooks from
 .It Pa /usr/local/share/hawkeye
 System knowledge artifacts from
 .Nm hawkeye-data .
+.It Pa /usr/local/share/hawkeye/models
+Well-known drop directory for optional local
+.Pa *.gguf
+files
+.Pq not vendored; empty
+.Va llm.local.model_path
+discovers here
+.Ns .
 .El
 .Sh EXIT STATUS
 .Ex -std

@@ -40,20 +40,49 @@ install: build
 	install -m 0644 man/hawkeye.8 $(DESTDIR)$(PREFIX)/share/man/man8/hawkeye.8
 	install -m 0644 man/hawkeye.conf.5 $(DESTDIR)$(PREFIX)/share/man/man5/hawkeye.conf.5
 
-# DESTDIR/STAGEDIR always stages prefixes (package/chroot). Live install
-# writes /rescue only when it is a real directory — not a dangling bastille
-# symlink. /boot/hawkeye is created when /boot exists and is writable.
-# Missing /boot is skip. A present /boot that is read-only (bastille
-# symlink to a release boot, EROFS/EACCES/EPERM) is skip — same style as
-# skip /rescue. Do not remount. bmake recipes run with set -e, so live
-# mkdir status is captured with ||; an unguarded $(mkdir) exits 1 before
-# skip. DESTDIR still creates both prefixes and still fails on errors.
-# Knowledge artifacts come from hawkeye-data (dual prefix); set
-# KNOWLEDGE_SRC to copy a sqlite file.
+# DESTDIR/STAGEDIR always stages prefixes (package/chroot). Live /rescue:
+# a real directory or a symlink to a writable rescue image is installed
+# INTO (do not replace or empty FreeBSD tools). A dangling bastille
+# symlink is unlinked and replaced with a real directory so
+# /rescue/hawkeye is a runnable binary. EROFS/EACCES/EPERM skip with the
+# same read-only message as /boot. Missing /rescue is skip. Do not
+# remount. bmake recipes run with set -e, so live status is captured
+# with ||; an unguarded $(mkdir) exits 1 before skip. DESTDIR still
+# creates both prefixes and still fails on errors. Knowledge artifacts
+# come from hawkeye-data (dual prefix); set KNOWLEDGE_SRC to copy a
+# sqlite file.
 install-rescue: build
-	@if [ -n "$(DESTDIR)" ] || { [ -d "$(RESCUE_DIR)" ] && [ ! -L "$(RESCUE_DIR)" ]; }; then \
+	@if [ -n "$(DESTDIR)" ]; then \
 		install -d $(DESTDIR)$(RESCUE_DIR); \
 		install -m 0755 $(BIN) $(DESTDIR)$(RESCUE_DIR)/$(BIN); \
+	elif [ -d "$(RESCUE_DIR)" ]; then \
+		_rescue_rc=0; \
+		_rescue_err=$$(install -m 0755 $(BIN) "$(RESCUE_DIR)/$(BIN)" 2>&1) || _rescue_rc=$$?; \
+		if [ $$_rescue_rc -ne 0 ]; then \
+			case "$$_rescue_err" in \
+			*Read-only*|*read-only*|*Permission\ denied*|*Operation\ not\ permitted*|*EROFS*|*EACCES*|*EPERM*) \
+				echo "install-rescue: skip $(RESCUE_DIR) (read-only)"; \
+				;; \
+			*) \
+				echo "$$_rescue_err" >&2; \
+				exit $$_rescue_rc; \
+				;; \
+			esac; \
+		fi; \
+	elif [ -L "$(RESCUE_DIR)" ]; then \
+		_rescue_rc=0; \
+		_rescue_err=$$({ rm -f "$(RESCUE_DIR)" && mkdir -m 0755 "$(RESCUE_DIR)" && install -m 0755 $(BIN) "$(RESCUE_DIR)/$(BIN)"; } 2>&1) || _rescue_rc=$$?; \
+		if [ $$_rescue_rc -ne 0 ]; then \
+			case "$$_rescue_err" in \
+			*Read-only*|*read-only*|*Permission\ denied*|*Operation\ not\ permitted*|*EROFS*|*EACCES*|*EPERM*) \
+				echo "install-rescue: skip $(RESCUE_DIR) (read-only)"; \
+				;; \
+			*) \
+				echo "$$_rescue_err" >&2; \
+				exit $$_rescue_rc; \
+				;; \
+			esac; \
+		fi; \
 	else \
 		echo "install-rescue: skip $(RESCUE_DIR) (not a real directory)"; \
 	fi

@@ -35,3 +35,6 @@
 | T026 | sqlite-vec / vector search when RAM allows | DONE | cursor/knowledge-sqlite-vec-63f0 | FTS if embeddings empty; local embedder only; no cloud; no GGUF vendored |
 | T027 | install-rescue bmake set -e mkdir | DONE | cursor/bmake-install-rescue-set-e-c3b6 | \|\| _boot_rc so bmake set -e does not abort RO skip; DESTDIR still creates / fails |
 | T028 | rc.d daemon -p pidfile 0644 | DONE | cursor/pidfile-readable-0644-1f09 | seed 0644 before daemon -p; doctor flags 0600; apply dry-run unchanged |
+| T029 | Auto-discover local GGUF when model_path empty | DONE | cursor/operator-gguf-embed-rescue-fbcf | well-known models dir; quiet TTY skip if missing; doctor note not fail |
+| T030 | hawkeye embed fills kit embeddings | DONE | cursor/operator-gguf-embed-rescue-fbcf | dry-run default; --yes writes; refuse RO; FakeEmbedder tests |
+| T031 | install-rescue dangling /rescue → /rescue/hawkeye | DONE | cursor/operator-gguf-embed-rescue-fbcf | replace dangling symlink; install into real /rescue; EROFS skip |

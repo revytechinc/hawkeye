@@ -70,7 +70,9 @@ flowchart TD
 
 The shipped kit may have zero `embeddings` rows. That is valid. A local
 embedder fills existing playbook/document chunks only on a writable handle
-(`OpenRW`). Consult never writes. No cloud embed API. No GGUF is vendored.
+(`OpenRW`) via `hawkeye embed --yes`. Consult never writes. No cloud embed
+API. No GGUF is vendored. Empty `llm.local.model_path` discovers a dropped
+GGUF under the well-known `models/` prefixes.
 
 ## Tiers
 

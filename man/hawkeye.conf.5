@@ -100,8 +100,19 @@ then
 Override with
 .Ev HAWKEYE_LLM_BIN .
 .It Va llm.local.model_path
-Path to a local GGUF model.
-Empty means LLM is optional
+Path to a local GGUF model, or a directory of
+.Pa *.gguf
+files.
+Empty means discover a GGUF under the well-known model dirs
+.Pq
+.Pa /boot/hawkeye/models ,
+.Pa /usr/local/share/hawkeye/models ,
+then those prefixes, then XDG
+.Ns
+or
+.Ev HAWKEYE_MODELS_DIR
+.Ns .
+If none is present, the LLM is optional
 .Pq quiet TTY skip; no model is vendored
 .Ns .
 Override with
@@ -197,6 +208,13 @@ Override config path.
 Local GGUF path.
 Overrides
 .Va llm.local.model_path .
+.It Ev HAWKEYE_MODELS_DIR
+Extra directory scanned for
+.Pa *.gguf
+when
+.Va llm.local.model_path
+is empty.
+Searched before the well-known prefixes.
 .It Ev HAWKEYE_LLM_BIN
 Local llama.cpp-style binary.
 Overrides

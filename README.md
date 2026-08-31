@@ -36,6 +36,7 @@ execs as root.
 | `hawkeye doctor` | Service health: config, perms, pidfile, deps, headroom. Human + JSON. Non-zero if unhealthy. |
 | `hawkeye mcp` | MCP server (stdio default; Streamable HTTP on `127.0.0.1`, bearer token required). |
 | `hawkeye update` | Refresh knowledge from hawkeye-data artifacts when writable. Unset `HAWKEYE_UPDATE_SOURCE` skips (rc start stays healthy). Dest defaults to `/usr/local/share/hawkeye/knowledge.sqlite`. |
+| `hawkeye embed [--dry-run\|--yes]` | Fill `embeddings` on a writable kit copy using the local embedder. **Default is dry-run.** `--yes` writes. Refuses a read-only store. Consult stays read-only. |
 | `hawkeye init` | Write sample JSON config (mode `0600`). |
 | `hawkeye --check-config` | Validate JSON config and exit. Missing file uses compiled defaults (same as doctor). |
 
@@ -81,11 +82,12 @@ make install-rescue
 ```
 
 The port option `RESCUE` is off by default (thin bastille jails often have
-`/rescue` as a dangling symlink). Live `make install-rescue` writes `/rescue`
-only when it is a real directory; `/boot/hawkeye` is created when `/boot`
-exists and is writable. A read-only `/boot` (bastille symlink to a release
-boot; EROFS/EACCES/EPERM) is skipped the same way as dangling `/rescue`.
-The install does not remount `/boot`.
+`/rescue` as a dangling symlink). Live `make install-rescue` installs
+*into* a real `/rescue` (or a symlink to a writable rescue image) without
+replacing FreeBSD tools. A dangling `/rescue` symlink is replaced with a
+real directory so `/rescue/hawkeye` is a runnable binary. `/boot/hawkeye`
+is created when `/boot` exists and is writable. A read-only `/rescue` or
+`/boot` (EROFS/EACCES/EPERM) is skipped. The install does not remount.
 Knowledge sqlite is not vendored here; hawkeye-data owns the dual
 prefix. `misc/llama-cpp` is optional and not a package dependency.
 
@@ -94,10 +96,14 @@ XDG. Install ships `config.json.sample` (mode `0644`, no secrets). A live
 `config.json` is optional: missing uses compiled defaults, so `hawkeye doctor`
 and `hawkeye --check-config` both succeed after pkg/make install. A present
 file is still validated; invalid JSON fails. Secrets are environment variables
-(`HAWKEYE_LLM_API_KEY`). Local inference uses a configured llama.cpp-style
-binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`) and GGUF (`HAWKEYE_LLM_MODEL` /
-`llm.local.model_path`). Optional embeddings use `HAWKEYE_EMBED_MODEL` /
+(`HAWKEYE_LLM_API_KEY`). Local inference uses a llama.cpp-style
+binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`, or `PATH`) and a GGUF
+(`HAWKEYE_LLM_MODEL` / `llm.local.model_path`, or the first `*.gguf` under
+`/usr/local/share/hawkeye/models`, `/boot/hawkeye/models`, or
+`HAWKEYE_MODELS_DIR`). Missing GGUF is a quiet TTY skip; `doctor` notes it
+and stays healthy. Optional embeddings use `HAWKEYE_EMBED_MODEL` /
 `llm.local.embed_model_path` (local only; no cloud; no GGUF vendored).
+`hawkeye embed --yes` fills a writable kit; consult never writes.
 Empty embeddings stay FTS-only. When vectors exist and RAM allows,
 consult ranks with sqlite-vec. GPU if present then CPU. Knowledge is
 `knowledge.sqlite` from hawkeye-data (FTS5 tables `documents_fts` and

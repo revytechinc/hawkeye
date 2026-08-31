@@ -98,3 +98,38 @@ func TestConsult_LocalCompletionAfterPlaybook(t *testing.T) {
 		t.Fatalf("completion must follow playbook:\n%s", out)
 	}
 }
+
+func TestConsult_AutoDiscoversGGUFWithoutJSONEdit(t *testing.T) {
+	dir := t.TempDir()
+	if err := knowledge.CreatePlaybookTestDB(filepath.Join(dir, "knowledge.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	canned := "canned local completion: root is read-only, remount the dataset"
+	bin, _ := writeFakeLlamaCLI(t, canned)
+	models := filepath.Join(dir, "models")
+	if err := os.MkdirAll(models, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(models, "tiny-chat.gguf"), []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, err := run(t, []string{"consult", "root", "is", "read-only"}, "", fakeHost{usr: true, varp: true}, map[string]string{
+		"HAWKEYE_KNOWLEDGE_PATH": dir,
+		"HAWKEYE_LLM_BIN":        bin,
+		"HAWKEYE_MODELS_DIR":     models,
+	})
+	if code != 0 {
+		t.Fatalf("%d %s %s", code, out, err)
+	}
+	for _, junk := range []string{"llm skipped", "skeleton"} {
+		if strings.Contains(out, junk) || strings.Contains(err, junk) {
+			t.Fatalf("TTY must not leak guts after discover: out=%s err=%s", out, err)
+		}
+	}
+	if !strings.Contains(out, knowledge.RemountPlaybookTitle) {
+		t.Fatalf("playbook missing:\n%s", out)
+	}
+	if !strings.Contains(out, canned) {
+		t.Fatalf("dropped GGUF must fire local-complete without editing JSON:\n%s", out)
+	}
+}

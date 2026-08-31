@@ -1113,3 +1113,83 @@ not required, GPU absent ok. Exit 1.
 present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
 SIGNALS FILES SEE ALSO; Xr daemon 8). `hawkeye.conf.5` has NAME
 DESCRIPTION KEYS ENVIRONMENT SEE ALSO. No hawkeye-www.
+
+## 26. Operator GGUF discover, embed CLI, dangling /rescue (2026-08-31)
+
+T029–T031. Product jail: empty `llm.local.model_path` never fired
+`Local.Complete` even after a GGUF was on disk. Kit `embeddings` stayed
+empty (FillEmbeddings existed, no CLI). Thin Bastille `/rescue` is often
+a dangling symlink; `make install-rescue` skipped it.
+
+Red (before discover / embed / Makefile replace):
+
+```
+# github.com/revytechinc/hawkeye/internal/llm_test
+undefined: llm.DiscoverModel
+undefined: llm.ResolveModel
+# github.com/revytechinc/hawkeye/internal/cli_test
+unknown field Embedder in struct literal of type cli.Env
+--- FAIL: TestRun_MissingOptionalGGUFIsNoteNotFail
+    doctor must note optional local GGUF
+--- FAIL: TestCanStageRescue_DanglingSymlinkAllowed
+    dangling bastille /rescue must be replaceable
+--- FAIL: TestMakefileInstallRescue_DanglingSymlinkWritesBinary
+    install-rescue: skip …/rescue (not a real directory)
+--- FAIL: TestMakefileInstallRescue_SymlinkToRealRescueInstallsInto
+    skip dangling /rescue (did not install into the real image)
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply      coverage: 98.0%
+ok  github.com/revytechinc/hawkeye/internal/cli        coverage: 85.2%
+ok  github.com/revytechinc/hawkeye/internal/doctor     coverage: 96.3%
+ok  github.com/revytechinc/hawkeye/internal/knowledge  coverage: 90.9%
+ok  github.com/revytechinc/hawkeye/internal/llm        coverage: 97.2%
+ok  github.com/revytechinc/hawkeye/internal/redact     coverage: 100.0%
+DiscoverModel          100.0%
+ResolveModel           100.0%
+ResolveEmbedModel      100.0%
+DefaultModelDirs       100.0%
+CanStageRescue         100.0%
+RescueSkipReadOnly     100.0%
+resolveLocalModels     100.0%
+cmdEmbed                77.4%
+total                  89.4%
+```
+
+`TestConsult_AutoDiscoversGGUFWithoutJSONEdit`: dropped `*.gguf` under
+`HAWKEYE_MODELS_DIR` plus `PATH`/`HAWKEYE_LLM_BIN` llama-cli prints
+playbook prose and the canned local-complete paragraph. Missing GGUF
+stays a quiet TTY skip (`TestConsult_NoModelQuietTTY`). `--json` may
+still note `llm skipped`. MCP consult stays `llm.None`.
+
+`hawkeye embed` default is dry-run (no `embeddings` rows, embedder not
+invoked). `--yes` fills a writable kit via FakeEmbedder.
+`--dry-run` wins over `--yes`. Read-only dest is refused. Secrets are
+not printed. Consult `Open` stays read-only.
+
+`make install-rescue`: dangling `/rescue` becomes a real directory with
+executable `/rescue/hawkeye`. A real `/rescue` (or symlink to a writable
+rescue image) is installed *into*; existing tools stay. EROFS/EACCES
+skips with `install-rescue: skip … (read-only)`. DESTDIR still stages
+both prefixes. bmake `|| _rescue_rc=$?` / `|| _boot_rc=$?`. No remount.
+
+`--check-config` (no file): exit 0, defaults.
+`--check-config` on `configs/config.example.json`: exit 0 (empty
+`model_path` still valid).
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing,
+`local_llm` ok `optional local GGUF missing (consult skips quietly)`,
+GPU absent ok. Exit 1.
+`TestResolveMode_DefaultIsDryRun` still default dry-run.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO; embed command; install-rescue dangling replace).
+`hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO;
+`HAWKEYE_MODELS_DIR` and well-known `models/` discover. No hawkeye-www.
+No GGUF vendored. Tests do not remount ZFS `/`.
