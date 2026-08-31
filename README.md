@@ -101,7 +101,9 @@ binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`, or `PATH`:
 `llama-completion` then `llama-cli` then `llama.cpp`). `llama-cli`
 b9426 is conversation-only; Complete adds `--single-turn --simple-io`
 so the panic session does not hang on `>`. Trailing chat leftovers
-(`> EOF by user`, `Exiting...`) are stripped. A GGUF
+(`> EOF by user`, `Exiting...`) are stripped. Embed resolves
+`llama-embedding` from `PATH` or `/usr/local/bin/llama-embedding` and
+does not reuse `llama-completion`. A GGUF
 (`HAWKEYE_LLM_MODEL` / `llm.local.model_path`, or the first `*.gguf` under
 `/usr/local/share/hawkeye/models`, `/boot/hawkeye/models`, or
 `HAWKEYE_MODELS_DIR`). Missing GGUF is a quiet TTY skip; `doctor` notes it

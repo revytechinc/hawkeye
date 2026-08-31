@@ -179,6 +179,18 @@ the query
 then related titles.
 When a local GGUF is configured or discovered under the well-known
 model dirs, the completion is printed after the playbook hits.
+Query-time sqlite-vec rank uses
+.Nm llama-embedding
+.Pq
+.Ev PATH
+or
+.Pa /usr/local/bin/llama-embedding
+.Ns ,
+not
+.Nm llama-completion .
+Missing
+.Nm llama-embedding
+stays FTS-only.
 .Nm llama-cli
 is invoked one-shot
 .Pq Fl -single-turn Fl -simple-io
@@ -345,6 +357,18 @@ The default is dry-run
 .Ns .
 .Fl -yes
 is required to write.
+The embedder is
+.Nm llama-embedding
+resolved from
+.Ev PATH
+or
+.Pa /usr/local/bin/llama-embedding
+.Ns ;
+.Va llm.local.bin
+stays the completer
+.Pq
+.Nm llama-completion
+.Ns .
 A read-only store is refused.
 Destination is
 .Fl -dest ,

@@ -15,7 +15,8 @@ import (
 	"github.com/revytechinc/hawkeye/internal/redact"
 )
 
-// Embed runs a local llama.cpp-style embedding job. GPU layers when a GPU
+// Embed runs llama-embedding against a local GGUF. It does not reuse
+// llm.local.bin (llama-completion / llama-cli). GPU layers when a GPU
 // is present and preferred; otherwise CPU. No cloud API. Secrets are redacted.
 func (l Local) Embed(ctx context.Context, text string) ([]float32, error) {
 	if ctx == nil {
@@ -34,7 +35,7 @@ func (l Local) Embed(ctx context.Context, text string) ([]float32, error) {
 	if strings.TrimSpace(l.EmbedModelPath) == "" {
 		return nil, ErrNoModel
 	}
-	bin := resolveBin(l.Bin)
+	bin := resolveEmbedBin(l.Bin)
 	if bin == "" {
 		return nil, ErrNoBinary
 	}
@@ -58,19 +59,27 @@ func (l Local) Model() string {
 	return strings.TrimSpace(l.ModelPath)
 }
 
+// embedSeparator is a single token that does not appear in playbook
+// text. llama-embedding 9426 defaults to newline, which splits a
+// playbook into many sequences and yields tens of thousands of dims
+// instead of the nomic 768-d mean pool.
+const embedSeparator = "<#sep#>"
+
 func embedArgs(bin, model, text string, useGPU bool) []string {
 	ngl := "0"
 	if useGPU {
 		ngl = "99"
 	}
+	// llama-embedding 9426 rejects --embedding and --no-display-prompt.
+	// llama-cli --embedding is invalid on that port. Do not pass either.
 	return []string{
 		bin,
 		"-m", model,
-		"--embedding",
 		"-p", text,
-		"--no-display-prompt",
 		"-ngl", ngl,
 		"--embd-output-format", "array",
+		"--pooling", "mean",
+		"--embd-separator", embedSeparator,
 	}
 }
 

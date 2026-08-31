@@ -1275,3 +1275,69 @@ CI on `0a8834c` failed `TestLocal_JailLikeGPUNullVRAMUsesCPUNotSkip` because
 `strings.Contains(capture, "99")` matched a digit sequence in the temp
 path while argv was `-ngl 0`. Assertions now match the `-ngl` argument
 exactly (`nglIs`).
+
+## 29. Embed uses llama-embedding, not llama-completion (2026-08-31)
+
+T034. Product jail hawkeye.revytechinc.com: hawkeye-data-0.1.0_4 kit
+has 16 nomic playbook embeddings (dim=768, length(vector)=3072,
+model=nomic-embed-text-v1.5.Q8_0.gguf). Consult still ranked FTS5
+BM25. Cause: llama-cpp-9426_1. `Embed()` reused `resolveBin(l.Bin)`
+(`/usr/local/bin/llama-completion`) plus `--embedding
+--no-display-prompt`. Facts: `llama-cli --embedding` is invalid;
+`llama-embedding` exists and works; it rejects `--no-display-prompt`
+and does not want `--embedding`; default newline embd-separator
+splits playbooks (dim tens of thousands). Working argv:
+`--embd-output-format array --pooling mean --embd-separator '<#sep#>'`.
+
+Red (before resolveEmbedBin / embedArgs change):
+
+```
+--- FAIL: TestLocal_EmbedLlamaEmbeddingRejectsChatFlags
+    llama-embedding 9426 rejects --embedding and --no-display-prompt:
+    local llm llama-embedding: exit status 1
+--- FAIL: TestLocal_EmbedPrefersLlamaEmbeddingNotCompletion
+    no embedding floats parsed
+--- FAIL: TestLocal_EmbedSiblingLlamaEmbeddingWhenPATHEmpty
+    no embedding floats parsed
+--- FAIL: TestLocal_EmbedDoesNotReuseLlamaCLI
+    llama-cli 9426 cannot embed; missing llama-embedding must skip: <nil>
+--- FAIL: TestLocal_EmbedParsesSmallArray
+    local llm llama-embedding: exit status 1
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+Embed                  100.0%
+embedArgs              100.0%
+parseEmbedding         100.0%
+resolveEmbedBin        100.0%
+isEmbedBin             100.0%
+resolveNamed           100.0%
+Complete               95.8%
+llm package            97.0%
+redact                 100.0%
+total                  89.5%
+```
+
+`llama-completion` is not invoked for Embed when `llama-embedding` is
+on PATH or beside the completer. `--no-display-prompt` and
+`--embedding` are not passed. Missing `llama-embedding` is
+`ErrNoBinary` (consult FTS). Small array and 768-float array parse.
+Complete still uses `llm.local.bin`. GPU embed fail retries `-ngl 0`.
+`TestResolveMode_DefaultIsDryRun` unchanged.
+
+`--check-config` (no file): exit 0, defaults.
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing,
+`local_llm` ok optional GGUF missing, GPU absent ok. Exit 1.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO; llama-embedding query-time rank).
+`hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO;
+`llm.local.bin` is the completer only. No hawkeye-www. No GGUF vendored.
+Consult stays read-only. LLM never execs as root.

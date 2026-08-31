@@ -99,6 +99,14 @@ then
 .Nm llama-cli
 then
 .Nm llama.cpp .
+This key is the completer only.
+Embed resolves
+.Nm llama-embedding
+from
+.Ev PATH ,
+the same directory as this binary, or
+.Pa /usr/local/bin/llama-embedding
+without editing JSON.
 .Nm llama-cli
 b9426 is conversation-only; Hawkeye adds
 .Fl -single-turn
@@ -106,6 +114,16 @@ and
 .Fl -simple-io
 so Complete does not hang the panic session on
 .Ql > .
+.Nm llama-embedding
+b9426 rejects
+.Fl -embedding
+and
+.Fl -no-display-prompt
+and needs
+.Fl -pooling
+.Li mean
+plus a single-token
+.Fl -embd-separator .
 Override with
 .Ev HAWKEYE_LLM_BIN .
 .It Va llm.local.model_path
@@ -131,6 +149,14 @@ Path to a local embedding GGUF.
 Empty means consult stays FTS-only and does not write
 .Va embeddings
 rows.
+Query-time rank invokes
+.Nm llama-embedding
+.Pq not
+.Va llm.local.bin
+.Ns .
+Missing
+.Nm llama-embedding
+stays FTS-only.
 No cloud embed API.
 Override with
 .Ev HAWKEYE_EMBED_MODEL .

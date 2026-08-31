@@ -19,10 +19,10 @@ flowchart TD
     CLI --> Knowledge["knowledge client: SQLite FTS RO + sqlite-vec"]
     CLI --> PlanApply["plan + apply gate"]
     CLI --> Doctor["doctor + headroom"]
-    CLI --> LLM["llm: llama-completion then llama-cli --single-turn; GPU then CPU"]
+    CLI --> LLM["llm: Complete llama-completion; Embed llama-embedding; GPU then CPU"]
     Knowledge -->|"consumes artifacts"| DataRepo["hawkeye-data artifacts"]
     PlanApply -->|"default dry-run; audit"| System["FreeBSD system"]
-    LLM -->|"redact first; GPU then CPU; null VRAM is CPU"| LocalBin["configured llama-cli; no cloud"]
+    LLM -->|"redact first; GPU then CPU; null VRAM is CPU"| LocalBin["llama-completion + llama-embedding; no cloud"]
     LLM -->|"optional"| Remote["Grok / FreeGrok / Claude via env key"]
 ```
 
