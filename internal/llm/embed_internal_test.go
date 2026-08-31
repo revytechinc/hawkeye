@@ -32,6 +32,15 @@ func TestResolveEmbedBin_ExplicitEmbeddingKept(t *testing.T) {
 	}
 }
 
+func TestResolveNamed_Empty(t *testing.T) {
+	if got := resolveNamed(""); got != "" {
+		t.Fatalf("empty name: %q", got)
+	}
+	if got := resolveNamed("   "); got != "" {
+		t.Fatalf("blank name: %q", got)
+	}
+}
+
 func TestIsEmbedBin(t *testing.T) {
 	if !isEmbedBin("/usr/local/bin/llama-embedding") {
 		t.Fatal("llama-embedding")

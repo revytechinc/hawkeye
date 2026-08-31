@@ -433,6 +433,53 @@ func TestLocal_EmbedParsesDim768Array(t *testing.T) {
 	}
 }
 
+func TestLocal_EmbedGPUInvokeFailFallsBackToCPU(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "fake-embed.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var ngl []string
+	l := llm.Local{
+		Bin:            filepath.Join(dir, "llama-embedding"),
+		EmbedModelPath: model,
+		PreferGPU:      true,
+		RequireGPU:     false,
+		GPUPresent:     true,
+		Headroom: headroom.Snapshot{
+			RAMFreeBytes:     1 << 30,
+			GPUPresent:       true,
+			GPUVRAMFreeBytes: vram(1 << 30),
+		},
+		Run: func(_ context.Context, argv []string) (string, error) {
+			for _, a := range argv {
+				if a == "--embedding" || a == "--no-display-prompt" {
+					t.Fatalf("chat flag on GPU fallback: %q", a)
+				}
+			}
+			for i, a := range argv {
+				if a == "-ngl" && i+1 < len(argv) {
+					ngl = append(ngl, argv[i+1])
+				}
+			}
+			if len(ngl) > 0 && ngl[len(ngl)-1] == "99" {
+				return "", errors.New("cuda error: no usable VRAM")
+			}
+			return "[1.0, 0.0]", nil
+		},
+	}
+	vec, err := l.Embed(context.Background(), "root filesystem is read-only")
+	if err != nil {
+		t.Fatalf("GPU fail must fall back to CPU embed: %v", err)
+	}
+	if len(vec) != 2 {
+		t.Fatalf("vec=%v", vec)
+	}
+	if len(ngl) < 2 || ngl[0] != "99" || ngl[1] != "0" {
+		t.Fatalf("expected -ngl 99 then 0, got %v", ngl)
+	}
+}
+
 func TestLocal_CompleteStillUsesConfiguredBin(t *testing.T) {
 	root := t.TempDir()
 	compCap := filepath.Join(root, "completion-argv.txt")
