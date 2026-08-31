@@ -447,6 +447,12 @@ rc.d script.
 .It Pa /var/run/hawkeye.pid
 Pidfile
 .Pq mode 0644 ; the PID is not a secret .
+The rc.d script seeds this mode before
+.Xr daemon 8
+.Fl p
+and chmods again after start so operator
+.Nm doctor
+can read it without root.
 .It Pa /rescue/hawkeye
 Static-capable rescue binary
 .Pq
@@ -475,6 +481,7 @@ System knowledge artifacts from
 exits non-zero when unhealthy.
 .Sh SEE ALSO
 .Xr hawkeye.conf 5 ,
+.Xr daemon 8 ,
 .Xr rc 8
 .Sh AUTHORS
 .An Mark LaPointe Aq Mt mark@cloudbsd.org

@@ -10,11 +10,19 @@ import (
 	"strings"
 )
 
+// Mode is world-readable. The PID is not a secret; operator doctor
+// must be able to read /var/run/hawkeye.pid without root.
+const Mode = 0o644
+
+func OperatorReadable(mode os.FileMode) bool {
+	return mode.Perm()&0o004 != 0
+}
+
 func Write(path string, pid int) error {
 	if pid <= 0 {
 		return fmt.Errorf("pid must be positive, got %d", pid)
 	}
-	return os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), 0o644)
+	return os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), Mode)
 }
 
 func Read(path string) (int, error) {

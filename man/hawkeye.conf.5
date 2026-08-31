@@ -168,6 +168,12 @@ Must not be empty or negative.
 Created mode
 .Li 0644
 .Pq the PID is not a secret so doctor can read it without root .
+The rc.d script seeds that mode before
+.Xr daemon 8
+.Fl p
+.Pq which would otherwise create
+.Li 0600
+.Ns .
 .It Va audit_log
 JSON-lines apply audit log.
 Mode 0600 when created.
@@ -264,7 +270,8 @@ then
 Per-user config and data.
 .El
 .Sh SEE ALSO
-.Xr hawkeye 8
+.Xr hawkeye 8 ,
+.Xr daemon 8
 .Sh AUTHORS
 .An Mark LaPointe Aq Mt mark@cloudbsd.org
 .Pp

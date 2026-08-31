@@ -52,6 +52,21 @@ hawkeye_doctor()
 	"${procname}" --config "${hawkeye_config}" doctor
 }
 
+hawkeye_pidfile_operator_readable()
+{
+	# PID is not a secret. daemon(8) pidfile_open(..., 0600) creates
+	# mode 0600 only when the path is missing. Seed 0644 first so
+	# open(O_CREAT) keeps the mode; chmod again after daemon -p.
+	# start_postcmd alone races when the parent returns before the
+	# file exists, or when daemon -f stays in the foreground.
+	if [ ! -e "${pidfile}" ]; then
+		( umask 022 && : > "${pidfile}" ) || warn "hawkeye: could not seed pidfile"
+	fi
+	if [ -f "${pidfile}" ]; then
+		chmod 0644 "${pidfile}" || warn "hawkeye: could not set pidfile mode 0644"
+	fi
+}
+
 hawkeye_prestart()
 {
 	hawkeye_checkconfig || return 1
@@ -75,15 +90,12 @@ hawkeye_prestart()
 	else
 		warn "hawkeye_mcp is NO; enable it to run the MCP listener"
 	fi
+	hawkeye_pidfile_operator_readable
 }
 
 hawkeye_poststart()
 {
-	# PID is not a secret. daemon(8) creates the pidfile 0600; doctor
-	# as a non-root operator must be able to read it.
-	if [ -f "${pidfile}" ]; then
-		chmod 0644 "${pidfile}" || warn "hawkeye: could not set pidfile mode 0644"
-	fi
+	hawkeye_pidfile_operator_readable
 }
 
 hawkeye_poststop()
