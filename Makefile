@@ -45,8 +45,11 @@ install: build
 # symlink. /boot/hawkeye is created when /boot exists and is writable.
 # Missing /boot is skip. A present /boot that is read-only (bastille
 # symlink to a release boot, EROFS/EACCES/EPERM) is skip — same style as
-# skip /rescue. Do not remount. Knowledge artifacts come from hawkeye-data
-# (dual prefix); set KNOWLEDGE_SRC to copy a sqlite file.
+# skip /rescue. Do not remount. bmake recipes run with set -e, so live
+# mkdir status is captured with ||; an unguarded $(mkdir) exits 1 before
+# skip. DESTDIR still creates both prefixes and still fails on errors.
+# Knowledge artifacts come from hawkeye-data (dual prefix); set
+# KNOWLEDGE_SRC to copy a sqlite file.
 install-rescue: build
 	@if [ -n "$(DESTDIR)" ] || { [ -d "$(RESCUE_DIR)" ] && [ ! -L "$(RESCUE_DIR)" ]; }; then \
 		install -d $(DESTDIR)$(RESCUE_DIR); \
@@ -64,8 +67,8 @@ install-rescue: build
 			install -m 0644 "$(KNOWLEDGE_SRC)" $(BOOT_HAWKEYE)/knowledge.sqlite; \
 		fi; \
 	elif [ -d "`dirname $(BOOT_HAWKEYE)`" ]; then \
-		_boot_err=$$(mkdir -m 0755 $(BOOT_HAWKEYE) 2>&1); \
-		_boot_rc=$$?; \
+		_boot_rc=0; \
+		_boot_err=$$(mkdir -m 0755 $(BOOT_HAWKEYE) 2>&1) || _boot_rc=$$?; \
 		if [ $$_boot_rc -eq 0 ]; then \
 			if [ -n "$(KNOWLEDGE_SRC)" ] && [ -f "$(KNOWLEDGE_SRC)" ]; then \
 				install -m 0644 "$(KNOWLEDGE_SRC)" $(BOOT_HAWKEYE)/knowledge.sqlite; \

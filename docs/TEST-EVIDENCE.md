@@ -1004,3 +1004,59 @@ absent ok. Exit 1. Human + JSON.
 present. `llm.local.embed_model_path` and `HAWKEYE_EMBED_MODEL` are in
 `hawkeye.conf(5)`. Consult sqlite-vec rank is in `hawkeye(8)`.
 No hawkeye-www. Tests do not remount ZFS `/`. No GGUF vendored.
+
+## 24. install-rescue bmake set -e mkdir (2026-08-31)
+
+T027. Product jail after PR 21 (`0a43fb4ed536`): stock
+`make install-rescue` died **exit 1** (not 71) at
+`_boot_err=$(mkdir …)`. bmake recipes run with `set -e`, so EROFS
+mkdir aborted the recipe before skip. GNU make on CI hid this.
+Do not remount.
+
+Red (stock PR 21 recipe extracted and run under `set -e`):
+
+```
+--- FAIL: TestMakefileInstallRescue_SetEDoesNotAbortOnROMkdir
+    layout_stage_test.go: Makefile mkdir capture must survive set -e
+    on RO dest (bmake): exit status 1
+--- FAIL: TestMakefileInstallRescue
+    layout_test.go: bmake recipes run with set -e; mkdir status must
+    be captured with || so RO skip runs
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+TestUnguardedMkdirCommandSubDiesUnderSetE     PASS
+TestMakefileInstallRescue_SetEDoesNotAbortOnROMkdir PASS
+TestMakefileInstallRescue_FakeRODestExit0     PASS
+TestMakefileInstallRescue_ExistingFileFails   PASS
+TestMakefileInstallRescue_DESTDIRCreatesBoth  PASS
+TestMakefileInstallRescue_DESTDIRRODestFails  PASS
+IsReadOnlyCreateError  100.0%
+BootKitSkipMessage     100.0%
+StageBootKit           100.0%
+CanStageBootKit        100.0%
+CanStageRescue         100.0%
+realDir                100.0%
+redact                 100.0%
+```
+
+Live mkdir uses `_boot_rc=0; _boot_err=$(mkdir …) || _boot_rc=$?`.
+Unguarded `$(mkdir)` is asserted to die under `set -e` so GNU make
+cannot hide the trap. `/rescue` has no command-sub mkdir; any future
+`$(mkdir)` must use `||`. DESTDIR still creates both prefixes.
+EEXIST (file in the way) and DESTDIR + RO dest still fail the target.
+Tests do not remount ZFS or the jail `/boot`.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing, GPU
+absent ok. Exit 1.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO). `hawkeye.conf.5` has NAME DESCRIPTION KEYS
+ENVIRONMENT SEE ALSO. No hawkeye-www.

@@ -42,6 +42,20 @@ func TestMakefileInstallRescue(t *testing.T) {
 	if !strings.Contains(mk, "skip $(BOOT_HAWKEYE) (read-only)") {
 		t.Fatal("RO /boot skip message must match skip /rescue style")
 	}
+	if !strings.Contains(mk, `_boot_err=$$(mkdir -m 0755 $(BOOT_HAWKEYE) 2>&1) || _boot_rc=$$?`) {
+		t.Fatal("bmake recipes run with set -e; mkdir status must be captured with || so RO skip runs")
+	}
+	if strings.Contains(mk, `_boot_err=$$(mkdir -m 0755 $(BOOT_HAWKEYE) 2>&1);`) {
+		t.Fatal("semicolon after $(mkdir) is the set -e trap; use || _boot_rc=$?")
+	}
+	for _, line := range strings.Split(mk, "\n") {
+		if !strings.Contains(line, "$$(mkdir") {
+			continue
+		}
+		if !strings.Contains(line, "||") {
+			t.Fatalf("command-sub mkdir dies under bmake set -e before skip: %s", line)
+		}
+	}
 	port, err := os.ReadFile(filepath.Join(root, "ports", "sysutils", "hawkeye", "Makefile"))
 	if err != nil {
 		t.Fatal(err)
