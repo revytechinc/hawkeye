@@ -365,3 +365,18 @@ also:
 `hawkeye doctor`: UNHEALTHY (knowledge missing), GPU absent ok.
 `CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
 
+## 13. TTY consult apply/edit prompt (2026-08-31)
+
+T015: after the operator TTY consult session (T013/T014), prompt
+`Apply these steps? [y/N/e]`. `--json`, `HAWKEYE_JSON`, non-TTY, and MCP
+do not prompt. Apply still defaults to dry-run; landing needs `--yes` or
+a second `y`. Editor abort/empty does not apply. Secrets are redacted
+per plan field (whole-document `redact.String` broke `password=` JSON).
+
+Rebased onto `origin/main` so Human() lead-playbook output and the prompt
+both remain.
+
+`go test ./internal/... ./cmd/hawkeye -count=1` PASS after rebase (see
+follow-up capture). Apply `ResolveMode` remains 100%. Tests use FAKE
+secret fixtures only.
+

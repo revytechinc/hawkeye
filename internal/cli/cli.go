@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/revytechinc/hawkeye/internal/apply"
-	"github.com/revytechinc/hawkeye/internal/audit"
 	"github.com/revytechinc/hawkeye/internal/config"
 	"github.com/revytechinc/hawkeye/internal/consult"
 	"github.com/revytechinc/hawkeye/internal/doctor"
@@ -34,10 +33,25 @@ type Env struct {
 	Stderr io.Writer
 	Getenv func(string) string
 	Host   probe.Host
+	// TTY is true when stdin is an interactive terminal. Tests set this;
+	// Run() detects it from stdin. Non-TTY, --json, and MCP never prompt.
+	TTY bool
+	// Editor, if set, edits a temp plan file (tests). Production uses VISUAL/EDITOR/vi.
+	Editor func(path string) error
+	// Exec overrides apply.SysExecutor (tests). Mutation still requires --yes / second y.
+	Exec apply.Executor
 }
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return RunEnv(Env{Args: args, Stdin: stdin, Stdout: stdout, Stderr: stderr, Getenv: os.Getenv, Host: probe.Live()})
+	return RunEnv(Env{
+		Args:   args,
+		Stdin:  stdin,
+		Stdout: stdout,
+		Stderr: stderr,
+		Getenv: os.Getenv,
+		Host:   probe.Live(),
+		TTY:    readerIsTTY(stdin),
+	})
 }
 
 func RunEnv(env Env) int {
@@ -193,8 +207,11 @@ Usage:
   hawkeye [--config PATH] [--check-config] [--json] <command> [args]
 
 Commands:
-  consult [query]     Diagnose using knowledge FTS and optional LLM (no writes).
+  consult [query]     Diagnose using knowledge FTS and optional LLM.
                       Human session on stdout; --json or HAWKEYE_JSON=1 for scripts.
+                      TTY: Apply these steps? [y/N/e]. Default N.
+                      Landing still needs --yes or a second y. No prompt
+                      on --json, non-TTY, or MCP.
   plan [query]        Propose steps; no mutation.
                       Human session on stdout; --json or HAWKEYE_JSON=1 for apply.
   apply [--dry-run|--yes] [plan.json]
@@ -298,7 +315,11 @@ func cmdConsult(env Env, fs flagset, cfg config.Config) int {
 		return 0
 	}
 	fmt.Fprint(env.Stdout, res.Human())
-	return 0
+	if !env.TTY {
+		return 0
+	}
+	fmt.Fprintln(env.Stdout)
+	return promptConsultApply(env, fs, cfg, makePlan(q, snap))
 }
 
 func wantJSON(fs flagset, getenv func(string) string) bool {
@@ -381,19 +402,7 @@ func cmdApply(env Env, fs flagset, cfg config.Config) int {
 		fmt.Fprintln(env.Stderr, "hawkeye apply: plan JSON:", err)
 		return 1
 	}
-	auditor := apply.Auditor(apply.NopAuditor{})
-	if cfg.AuditLog != "" {
-		dir := filepath.Dir(cfg.AuditLog)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			if mode == apply.ModeApply {
-				fmt.Fprintf(env.Stderr, "hawkeye apply: audit log %s: %v\n", cfg.AuditLog, err)
-				return 1
-			}
-		} else {
-			auditor = &audit.File{Path: cfg.AuditLog}
-		}
-	}
-	res, err := apply.Execute(p, mode, apply.ActorOperator, apply.SysExecutor{}, auditor)
+	res, err := executePlan(env, cfg, p, mode)
 	if err != nil {
 		fmt.Fprintln(env.Stderr, err)
 		return 1
