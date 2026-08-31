@@ -863,3 +863,23 @@ SIGNALS FILES SEE ALSO). `hawkeye.conf.5` has NAME DESCRIPTION KEYS
 ENVIRONMENT SEE ALSO. Rescue paths `/rescue/hawkeye` and `/boot/hawkeye`
 are in `hawkeye.8`. `HAWKEYE_LLM_MODEL`, `HAWKEYE_LLM_BIN`, and
 `HAWKEYE_UPDATE_SOURCE` are in `hawkeye.conf(5)`.
+
+### D. Live product jail facts (hawkeye.revytechinc.com)
+
+Installed SHA eaf77537: `hawkeye_enable=YES hawkeye_mcp=YES hawkeye_update=YES`.
+Empty src/dest made every start log `hawkeye update failed (continuing)`.
+Skip-if-no-src is the rc-healthy path; dest defaults to
+`/usr/local/share/hawkeye/knowledge.sqlite`.
+
+`llm.local.backend=llama.cpp`, empty `model_path`, `prefer_gpu=true`.
+No llama-cli/server, no GGUF. `misc/llama-cpp` exists in ports and is
+not a RUN_DEPENDS. Completer runs only when bin+model are configured.
+No model → `ErrNoModel` (quiet TTY). `/dev/nvidia0` present,
+`gpu_vram_free_bytes` null, ~129GiB RAM: CPU job is not blocked.
+
+`/rescue` is a dangling bastille symlink; `/boot` exists without
+`/boot/hawkeye`. `CanStageRescue` skips the dangling symlink; DESTDIR
+still stages. `make install-rescue` with a fixture dangling symlink
+printed `skip … (not a real directory)` and created `/boot/hawkeye`.
+DESTDIR stage still wrote `/rescue/hawkeye`. Tests do not remount ZFS
+`/`. knowledge embeddings table (0 rows) is unused; no corpus vendored.

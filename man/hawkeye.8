@@ -115,9 +115,23 @@ and are not vendored here.
 Set
 .Ev KNOWLEDGE_SRC
 to copy a sqlite file into the rescue kit.
+On a live host,
+.Pa /rescue
+is written only when it is a real directory.
+A dangling bastille
+.Pa /rescue
+symlink
+.Pq thin jail
+is skipped.
+.Pa /boot/hawkeye
+is created when
+.Pa /boot
+exists.
 The port option
 .Cm RESCUE
-installs the same paths.
+is off by default and stages the same paths under
+.Ev DESTDIR
+.Ns .
 .Sh COMMANDS
 .Bl -tag -width indent
 .It Nm

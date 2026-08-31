@@ -27,6 +27,15 @@ func TestAllow_ExhaustedRAMBlocks(t *testing.T) {
 	}
 }
 
+func TestAllow_GPUPresentNullVRAMDoesNotBlockCPUJob(t *testing.T) {
+	snap := headroom.Snapshot{RAMFreeBytes: 129 << 30, GPUPresent: true, GPUVRAMFreeBytes: nil}
+	ram := int64(256 << 20)
+	job := headroom.Job{NeedRAM: true, NeedGPU: false}
+	if err := headroom.Allow(job, snap, &ram, nil, nil, nil); err != nil {
+		t.Fatalf("null VRAM must not block a CPU job: %v", err)
+	}
+}
+
 func TestAllow_GPUJobFailsWhenRequiredVRAMExhausted(t *testing.T) {
 	zero := int64(0)
 	min := int64(1 << 30)

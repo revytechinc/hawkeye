@@ -34,6 +34,33 @@ func writeFakeLlama(t *testing.T, capture, canned string) string {
 	return bin
 }
 
+func TestLocal_JailLikeGPUNullVRAMNoModelSkips(t *testing.T) {
+	// Live product jail: /dev/nvidia0 present, gpu_vram_free_bytes null,
+	// llama.cpp backend, empty model_path, prefer_gpu, no llama-cli, no GGUF.
+	ram := int64(256 * 1024 * 1024)
+	l := llm.Local{
+		Backend:    "llama.cpp",
+		PreferGPU:  true,
+		RequireGPU: false,
+		GPUPresent: true,
+		Headroom: headroom.Snapshot{
+			RAMFreeBytes:     129 << 30,
+			RAMTotalBytes:    129 << 30,
+			GPUPresent:       true,
+			GPUVRAMFreeBytes: nil,
+		},
+		RAMMin:  &ram,
+		VRAMMin: nil,
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "zpool degraded", NeedGPU: false, NeedRAM: true})
+	if !errors.Is(err, llm.ErrNoModel) {
+		t.Fatalf("no model must skip, not block on null VRAM: %v", err)
+	}
+	if strings.Contains(resp.Text, "skeleton") || strings.Contains(resp.Text, "llm skipped") {
+		t.Fatalf("no-model must not invent guts: %q", resp.Text)
+	}
+}
+
 func TestLocal_NoModelSkips(t *testing.T) {
 	ram := int64(1)
 	l := llm.Local{

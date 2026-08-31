@@ -40,16 +40,25 @@ install: build
 	install -m 0644 man/hawkeye.8 $(DESTDIR)$(PREFIX)/share/man/man8/hawkeye.8
 	install -m 0644 man/hawkeye.conf.5 $(DESTDIR)$(PREFIX)/share/man/man5/hawkeye.conf.5
 
-# Static-capable binary at /rescue/hawkeye and the RO knowledge prefix.
-# Creates DESTDIR/rescue and DESTDIR/boot/hawkeye even when the host
-# has no /boot (package build chroot). Knowledge artifacts come from
-# hawkeye-data (dual prefix); set KNOWLEDGE_SRC to stage a sqlite file.
+# DESTDIR/STAGEDIR always stages prefixes (package/chroot). Live install
+# writes /rescue only when it is a real directory — not a dangling bastille
+# symlink. /boot/hawkeye is created when /boot exists; missing /boot is skip.
+# Knowledge artifacts come from hawkeye-data (dual prefix); set KNOWLEDGE_SRC
+# to copy a sqlite file. Do not remount ZFS.
 install-rescue: build
-	install -d $(DESTDIR)$(RESCUE_DIR)
-	install -m 0755 $(BIN) $(DESTDIR)$(RESCUE_DIR)/$(BIN)
-	install -d $(DESTDIR)$(BOOT_HAWKEYE)
-	@if [ -n "$(KNOWLEDGE_SRC)" ] && [ -f "$(KNOWLEDGE_SRC)" ]; then \
-		install -m 0644 "$(KNOWLEDGE_SRC)" $(DESTDIR)$(BOOT_HAWKEYE)/knowledge.sqlite; \
+	@if [ -n "$(DESTDIR)" ] || { [ -d "$(RESCUE_DIR)" ] && [ ! -L "$(RESCUE_DIR)" ]; }; then \
+		install -d $(DESTDIR)$(RESCUE_DIR); \
+		install -m 0755 $(BIN) $(DESTDIR)$(RESCUE_DIR)/$(BIN); \
+	else \
+		echo "install-rescue: skip $(RESCUE_DIR) (not a real directory)"; \
+	fi
+	@if [ -n "$(DESTDIR)" ] || [ -d "$(BOOT_HAWKEYE)" ] || [ -d "`dirname $(BOOT_HAWKEYE)`" ]; then \
+		install -d $(DESTDIR)$(BOOT_HAWKEYE); \
+		if [ -n "$(KNOWLEDGE_SRC)" ] && [ -f "$(KNOWLEDGE_SRC)" ]; then \
+			install -m 0644 "$(KNOWLEDGE_SRC)" $(DESTDIR)$(BOOT_HAWKEYE)/knowledge.sqlite; \
+		fi; \
+	else \
+		echo "install-rescue: skip $(BOOT_HAWKEYE) (no /boot)"; \
 	fi
 
 man:
