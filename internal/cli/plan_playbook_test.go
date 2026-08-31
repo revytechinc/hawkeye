@@ -73,7 +73,7 @@ func TestPlan_HumanShowsStoredCommands(t *testing.T) {
 }
 
 func TestPlan_WritableNoHitsNoEcho(t *testing.T) {
-	code, out, err := run(t, []string{"plan", "--json", "hello"}, "", fakeHost{usr: true, varp: true}, nil)
+	code, out, err := run(t, []string{"plan", "--json", "hello"}, "", fakeHost{usr: true, varp: true}, isolatedKit(t))
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
 	}

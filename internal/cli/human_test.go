@@ -78,7 +78,7 @@ func TestConsult_HAWKEYE_JSON(t *testing.T) {
 }
 
 func TestPlan_DefaultIsHumanNotJSON(t *testing.T) {
-	code, out, err := run(t, []string{"plan", "restart", "sshd"}, "", fakeHost{ro: true, rescue: true}, nil)
+	code, out, err := run(t, []string{"plan", "restart", "sshd"}, "", fakeHost{ro: true, rescue: true}, isolatedKit(t))
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
 	}
@@ -95,7 +95,7 @@ func TestPlan_DefaultIsHumanNotJSON(t *testing.T) {
 }
 
 func TestPlan_JSONFlagDumpsMachineObject(t *testing.T) {
-	code, out, err := run(t, []string{"plan", "--json", "pkg", "install", "foo"}, "", fakeHost{ro: true, rescue: true}, nil)
+	code, out, err := run(t, []string{"plan", "--json", "pkg", "install", "foo"}, "", fakeHost{ro: true, rescue: true}, isolatedKit(t))
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
 	}
@@ -108,7 +108,9 @@ func TestPlan_JSONFlagDumpsMachineObject(t *testing.T) {
 }
 
 func TestPlan_HAWKEYE_JSONYes(t *testing.T) {
-	code, out, err := run(t, []string{"plan", "hello"}, "", fakeHost{usr: true, varp: true}, map[string]string{"HAWKEYE_JSON": "yes"})
+	env := isolatedKit(t)
+	env["HAWKEYE_JSON"] = "yes"
+	code, out, err := run(t, []string{"plan", "hello"}, "", fakeHost{usr: true, varp: true}, env)
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
 	}

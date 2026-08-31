@@ -166,7 +166,8 @@ emit JSON on stdout the same as
 .Fl -json .
 Unset means the operator session.
 .It Ev HAWKEYE_KNOWLEDGE_PATH
-Extra knowledge directory for tests and rescue overlays.
+Override knowledge search path for tests and rescue overlays.
+When set, compiled defaults and XDG paths are not searched.
 .It Ev HAWKEYE_DATA_ARTIFACT
 Source
 .Pa knowledge.sqlite

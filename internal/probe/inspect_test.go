@@ -249,12 +249,94 @@ ada0p4.eli    UNAVAIL   ada0p4
 	assertActionableHuman(t, text)
 }
 
+func TestInspect_RCExpandsNameLikeRCSubr(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"etc/fstab":       "/dev/gpt/root / ufs rw 1 1\n",
+		"etc/rc.conf":     "sshd_enable=\"YES\"\nntpd_enable=\"YES\"\n",
+		"etc/rc.d/sshd":   "#!/bin/sh\n# PROVIDE: sshd\ncommand=\"/usr/sbin/${name}\"\n",
+		"etc/rc.d/ntpd":   "#!/bin/sh\ncommand=/usr/sbin/$name\n",
+		"usr/sbin/sshd":   "",
+		"usr/sbin/ntpd":   "",
+		"etc/resolv.conf": "nameserver 1.1.1.1\n",
+	})
+	src := probe.Sources{
+		Root:     root,
+		ReadFile: os.ReadFile,
+		Stat:     os.Stat,
+		MountTable: func() (string, error) {
+			return "/dev/gpt/root / ufs rw 0 0\n", nil
+		},
+	}
+	h := fakeHost{exists: map[string]bool{"/usr": true, "/var": true}, carrier: true}
+	text := probe.Inspect(h, src).Human()
+	if strings.Contains(text, "${name}") || strings.Contains(text, "/usr/sbin/$name") {
+		t.Fatalf("rc.subr expands name; must not report the unexpanded path:\n%s", text)
+	}
+	if strings.Contains(strings.ToLower(text), "missing") && (strings.Contains(text, "sshd") || strings.Contains(text, "ntpd")) {
+		t.Fatalf("stock rc.d ${name}/$name binaries exist; inspect must be silent:\n%s", text)
+	}
+}
+
+func TestInspect_RCMissingBinaryUsesExpandedName(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"etc/fstab":       "/dev/gpt/root / ufs rw 1 1\n",
+		"etc/rc.conf":     "sshd_enable=\"YES\"\n",
+		"etc/rc.d/sshd":   "#!/bin/sh\ncommand=\"/usr/sbin/${name}\"\n",
+		"etc/resolv.conf": "nameserver 1.1.1.1\n",
+	})
+	src := probe.Sources{
+		Root:     root,
+		ReadFile: os.ReadFile,
+		Stat:     os.Stat,
+		MountTable: func() (string, error) {
+			return "/dev/gpt/root / ufs rw 0 0\n", nil
+		},
+	}
+	h := fakeHost{exists: map[string]bool{"/usr": true}, carrier: true}
+	text := probe.Inspect(h, src).Human()
+	if strings.Contains(text, "${name}") {
+		t.Fatalf("missing-binary text must use the expanded path:\n%s", text)
+	}
+	if !strings.Contains(text, "/usr/sbin/sshd") || !strings.Contains(strings.ToLower(text), "missing") {
+		t.Fatalf("want expanded /usr/sbin/sshd missing:\n%s", text)
+	}
+	assertActionableHuman(t, text)
+}
+
+func TestInspect_RCDoesNotExpandNamePrefix(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"etc/fstab":       "/dev/gpt/root / ufs rw 1 1\n",
+		"etc/rc.conf":     "sshd_enable=\"YES\"\n",
+		"etc/rc.d/sshd":   "#!/bin/sh\ncommand=\"/opt/$namespace/bin/sshd\"\n",
+		"etc/resolv.conf": "nameserver 1.1.1.1\n",
+	})
+	src := probe.Sources{
+		Root:     root,
+		ReadFile: os.ReadFile,
+		Stat:     os.Stat,
+		MountTable: func() (string, error) {
+			return "/dev/gpt/root / ufs rw 0 0\n", nil
+		},
+	}
+	h := fakeHost{exists: map[string]bool{"/usr": true}, carrier: true}
+	text := probe.Inspect(h, src).Human()
+	if strings.Contains(text, "sshdspace") || strings.Contains(text, "/opt/sshd") {
+		t.Fatalf("$namespace must not be treated as $name:\n%s", text)
+	}
+	if strings.Contains(strings.ToLower(text), "missing") {
+		t.Fatalf("unexpanded rc vars must not false-positive a missing binary:\n%s", text)
+	}
+}
+
 func TestInspect_HealthyIsSilent(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"etc/fstab":       "/dev/gpt/root / ufs rw 1 1\n/dev/gpt/var /var ufs rw 0 2\n",
 		"etc/rc.conf":     "sshd_enable=\"YES\"\nhostname=\"ok\"\n",
-		"etc/rc.d/sshd":   "#!/bin/sh\ncommand=\"/usr/sbin/sshd\"\n",
+		"etc/rc.d/sshd":   "#!/bin/sh\ncommand=\"/usr/sbin/${name}\"\n",
 		"usr/sbin/sshd":   "",
 		"etc/resolv.conf": "nameserver 1.1.1.1\n",
 	})

@@ -167,8 +167,17 @@ func TestCheckConfig_FailsOnGarbage(t *testing.T) {
 	}
 }
 
+func isolatedKit(t *testing.T) map[string]string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := knowledge.CreateTestDB(filepath.Join(dir, "knowledge.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	return map[string]string{"HAWKEYE_KNOWLEDGE_PATH": dir}
+}
+
 func TestPlan_RORootUnlockRW(t *testing.T) {
-	code, out, err := run(t, []string{"plan", "pkg install foo"}, "", fakeHost{ro: true, rescue: true}, nil)
+	code, out, err := run(t, []string{"plan", "pkg install foo"}, "", fakeHost{ro: true, rescue: true}, isolatedKit(t))
 	if code != 0 {
 		t.Fatalf("%d %s %s", code, out, err)
 	}

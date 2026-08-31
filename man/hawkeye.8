@@ -40,7 +40,9 @@ immediately: root read-only versus read-write and filesystem type, missing
 .Pa /etc/fstab
 versus mounts, zpool health, rc
 .Li *_enable
-versus missing scripts or binaries, network carrier and default route,
+versus missing scripts or binaries
+.Pq rc.d command= expands ${name} and $name from the script basename like rc.subr; inspect does not start services ,
+network carrier and default route,
 disk and inode headroom, and geli keystatus.
 Each line is one actionable finding.
 Silence means that subsystem looks fine.

@@ -720,3 +720,61 @@ Doctor still reports pidfile/config — not host first-look.
 `hawkeye --json inspect` / bare `--json`: structured findings; no REPL.
 Session documents host first-look before `>`.
 `inspect` is diagnose-only and is not `doctor`.
+
+## 20. inspect expands rc.subr `${name}` (2026-08-31)
+
+T023: live jail first-look printed
+`sshd_enable=YES but /usr/sbin/${name} is missing` while `/usr/sbin/sshd`
+exists. Stock rc.d uses `command="/usr/sbin/${name}"`; rc.subr expands
+`${name}` / `$name` from the script basename. Inspect did not.
+
+Red (`TestInspect_RCExpandsNameLikeRCSubr` before expand):
+
+```
+--- FAIL: TestInspect_RCExpandsNameLikeRCSubr
+    inspect_test.go: rc.subr expands name; must not report the unexpanded path:
+        sshd_enable=YES but /usr/sbin/${name} is missing; restore the binary or disable sshd
+        ntpd_enable=YES but /usr/sbin/$name is missing; restore the binary or disable ntpd
+--- FAIL: TestInspect_HealthyIsSilent
+    inspect_test.go: healthy host must be silent:
+        sshd_enable=YES but /usr/sbin/${name} is missing; restore the binary or disable sshd
+--- FAIL: TestKnowledgePaths_OverrideIsExclusive
+    knowledge_paths_test.go: HAWKEYE_KNOWLEDGE_PATH must isolate from live kit paths:
+        ["/tmp/kit-fixture" "/boot/hawkeye" "/usr/local/share/hawkeye" ...]
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+expandRCSubrName   100.0%
+expandDollarName   100.0%
+isRCIdent          100.0%
+rcCommand          100.0%
+rcBinaryMissing    100.0%
+knowledgePaths     100.0%
+probe package      87.6%
+cli package        84.1%
+redact             100.0%
+total              88.0%
+```
+
+`$namespace` is not treated as `$name`. Unexpanded `$` vars do not
+false-positive a missing binary. Diagnose only; services are not started.
+
+Plan tests `TestPlan_RORootUnlockRW`, `TestPlan_DefaultIsHumanNotJSON`,
+`TestPlan_JSONFlagDumpsMachineObject` open a FAKE `CreateTestDB` kit via
+`HAWKEYE_KNOWLEDGE_PATH`. That env now overrides compiled/XDG paths so
+live jail FTS cannot rank rc-enable-missing over unlock-rw.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye doctor` (no kit): UNHEALTHY, dependencies FAIL, GPU absent ok.
+Exit 1. Human + JSON.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS
+FILES KEYS ENVIRONMENT SEE ALSO). `${name}` / `$name` documented in
+`hawkeye(8)`; `HAWKEYE_KNOWLEDGE_PATH` override documented in
+`hawkeye.conf(5)`.
