@@ -161,6 +161,7 @@ func printApply(env Env, cfg config.Config, plan apply.Plan, mode apply.Mode) in
 	}
 	if res.Applied {
 		fmt.Fprintln(env.Stdout, "applied")
+		writeFirstLook(env)
 		return 0
 	}
 	if mode == apply.ModeApply {

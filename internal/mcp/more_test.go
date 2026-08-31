@@ -20,7 +20,7 @@ func TestHandle_InitializedAndMissingHandlers(t *testing.T) {
 	if resp.Error != nil {
 		t.Fatal(resp.Error)
 	}
-	for _, name := range []string{"consult", "plan", "apply", "doctor", "nope"} {
+	for _, name := range []string{"consult", "plan", "apply", "doctor", "inspect", "nope"} {
 		args, _ := json.Marshal(map[string]any{"name": name, "arguments": map[string]any{"query": "x"}})
 		got := s.Handle(mcp.Request{JSONRPC: "2.0", ID: 2, Method: "tools/call", Params: args})
 		if got.Error == nil {
@@ -34,9 +34,10 @@ func TestHandle_ToolsWithHandlers(t *testing.T) {
 		Consult: func(q string) (any, error) { return q, nil },
 		Plan:    func(q string) (any, error) { return apply.Plan{Summary: q}, nil },
 		Doctor:  func() (any, error) { return "ok", nil },
+		Inspect: func() (any, error) { return "host", nil },
 		Apply:   func(p apply.Plan, yes bool) (any, error) { return p.ID, nil },
 	})
-	for _, name := range []string{"consult", "plan", "doctor", "apply"} {
+	for _, name := range []string{"consult", "plan", "doctor", "inspect", "apply"} {
 		args, _ := json.Marshal(map[string]any{"name": name, "arguments": map[string]any{"query": "zfs", "plan": apply.Plan{ID: "1"}}})
 		got := s.Handle(mcp.Request{JSONRPC: "2.0", ID: 3, Method: "tools/call", Params: args})
 		if got.Error != nil {

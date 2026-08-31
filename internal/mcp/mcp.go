@@ -50,6 +50,7 @@ type Handlers struct {
 	Plan    func(query string) (any, error)
 	Apply   func(plan apply.Plan, yes bool) (any, error)
 	Doctor  func() (any, error)
+	Inspect func() (any, error)
 }
 
 type Server struct {
@@ -96,6 +97,7 @@ func toolList() []map[string]any {
 		{"name": "plan", "description": "Produce a JSON plan. No mutation."},
 		{"name": "apply", "description": "Apply a plan. Defaults to dry-run. Privileged mutation is operator-only."},
 		{"name": "doctor", "description": "Service health: config, permissions, pidfile, dependencies, headroom."},
+		{"name": "inspect", "description": "Host first-look (fstab, rc, zpool, disks, net). Diagnose only. Not doctor."},
 	}
 }
 
@@ -135,6 +137,11 @@ func (s *Server) callTool(call ToolCall) (any, error) {
 			return nil, fmt.Errorf("doctor handler missing")
 		}
 		return s.Handlers.Doctor()
+	case "inspect":
+		if s.Handlers.Inspect == nil {
+			return nil, fmt.Errorf("inspect handler missing")
+		}
+		return s.Handlers.Inspect()
 	default:
 		return nil, fmt.Errorf("unknown tool %q", call.Name)
 	}
