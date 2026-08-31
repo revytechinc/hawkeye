@@ -221,6 +221,55 @@ func TestLocal_NoBinary(t *testing.T) {
 	}
 }
 
+func TestLocal_LookPathFindsLlamaCLI(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlama(t, "", "from-path")
+	t.Setenv("PATH", filepath.Dir(bin))
+	l := llm.Local{
+		Backend:   "llama.cpp",
+		ModelPath: model,
+		Headroom:  ampleRAM(),
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "from-path" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+}
+
+func TestLocal_RunHookAndExecError(t *testing.T) {
+	l := llm.Local{
+		Backend:   "llama.cpp",
+		Bin:       "/nonexistent/llama-cli",
+		ModelPath: "/models/fake.gguf",
+		Headroom:  ampleRAM(),
+		Run: func(ctx context.Context, argv []string) (string, error) {
+			if len(argv) < 3 || argv[1] != "-m" {
+				t.Fatalf("argv %v", argv)
+			}
+			return "hooked", nil
+		},
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "hooked" {
+		t.Fatal(resp.Text)
+	}
+	l.Run = nil
+	_, err = l.Complete(context.Background(), llm.Request{Prompt: "hello"})
+	if err == nil {
+		t.Fatal("missing binary must fail")
+	}
+}
+
 func TestLocal_HeadroomRefuse(t *testing.T) {
 	ram := int64(1 << 40)
 	l := llm.Local{

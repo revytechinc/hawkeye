@@ -778,3 +778,88 @@ present (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS
 FILES KEYS ENVIRONMENT SEE ALSO). `${name}` / `$name` documented in
 `hawkeye(8)`; `HAWKEYE_KNOWLEDGE_PATH` override documented in
 `hawkeye.conf(5)`.
+
+## 21. CORE: local llama.cpp, update skip, rescue layout (2026-08-31)
+
+T009 / T012 / T024. Product binary only. No hawkeye-www. No vendored
+GGUF or hawkeye-data sqlite. Tests do not remount live ZFS.
+
+### A. Local LLM is inference, not a skeleton
+
+`Local.Complete` execs a configured llama.cpp-style binary (`-m`, `-p`,
+`--no-display-prompt`, `-ngl 99` GPU / `-ngl 0` CPU). Prompts are
+redacted first. `headroom.Allow()` still gates the job.
+
+Red (before the exec, against the `fmt.Sprintf("local %s skeleton")` path):
+
+```
+--- FAIL: TestLocal_FakeBinaryCapturesPromptAndReturnsCanned
+    llm_test.go: text="local llama.cpp skeleton; GPU=false" want canned
+--- FAIL: TestConsult_LocalCompletionAfterPlaybook
+    consult_llm_test.go: local completion missing after playbook hits
+```
+
+Green: fake `llama-cli` captures argv and returns canned text. Secret
+`password=fake-password-for-tests-only` is not in argv or response.
+No model → `ErrNoModel` (TTY quiet; `--json` still notes `llm skipped`).
+GPU required missing → `ErrGPURequired`. PATH look-up finds `llama-cli`.
+Consult TTY prints the completion after the remount playbook.
+
+`llm.Complete` 95.0%. `resolveBin` 100%. `cliArgs` 100%. `invoke` 100%.
+
+### B. update skip so rc start is healthy
+
+Red:
+
+```
+--- FAIL: TestRun_EmptySourceSkips
+    update_test.go: unset source must skip with no error (rc start):
+        update source and destination are required
+--- FAIL: TestUpdate_NoSourceSkipsHealthy
+    update_skip_test.go: rc start must not log missing src/dest
+```
+
+Green: empty source returns `("", nil)`. Dest defaults to
+`/usr/local/share/hawkeye/knowledge.sqlite`. `HAWKEYE_UPDATE_SOURCE`
+copies when set. RO + set source still refuses (unlock-rw). Live
+`hawkeye update` with no env: exit 0.
+
+`update.ResolveDest` 100%. `update.Run` 75.0% (copy/rename IO faults
+need a live dest we will not write).
+
+### C. Rescue layout
+
+`make install-rescue DESTDIR=$STAGE` created `$STAGE/rescue/hawkeye`
+(executable) and `$STAGE/boot/hawkeye` without a live `/boot`.
+Port option `RESCUE` is in `ports/sysutils/hawkeye/Makefile`.
+Path order: `HAWKEYE_KNOWLEDGE_PATH` exclusive; default
+`/boot/hawkeye` then `/usr/local/share/hawkeye`.
+
+`SearchPaths` 100%. `knowledgePaths` covered by exclusive + order tests.
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/llm        coverage: 95.3%
+ok  github.com/revytechinc/hawkeye/internal/update     coverage: 77.8%
+ok  github.com/revytechinc/hawkeye/internal/cli        coverage: 85.0%
+ok  github.com/revytechinc/hawkeye/internal/knowledge  coverage: 87.2%
+ok  github.com/revytechinc/hawkeye/internal/consult    coverage: 96.8%
+ok  github.com/revytechinc/hawkeye/internal/redact     coverage: 100.0%
+total: (statements) 88.6%
+```
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye update` (no source): exit 0, no src/dest error.
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing, GPU
+absent ok. Exit 1.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO). `hawkeye.conf.5` has NAME DESCRIPTION KEYS
+ENVIRONMENT SEE ALSO. Rescue paths `/rescue/hawkeye` and `/boot/hawkeye`
+are in `hawkeye.8`. `HAWKEYE_LLM_MODEL`, `HAWKEYE_LLM_BIN`, and
+`HAWKEYE_UPDATE_SOURCE` are in `hawkeye.conf(5)`.
