@@ -21,6 +21,5 @@
 | T012 | hawkeye-data artifact fetch | OPEN | | `update` copies a file |
 | T013 | Consult/plan human TTY (JSON behind --json) | DONE | cursor-consult-human-tty-3358 | operator prose default |
 | T014 | Consult TTY: lead actionable playbook + also | DONE | cursor-consult-tty-lead-3358 | omit query/tier/llm skipped |
-<<<<<<< HEAD
 | T015 | TTY consult apply/edit prompt | DONE | cursor/consult-apply-prompt-2ee7 | y/N/e after consult; --json/non-TTY silent; --yes still required to land |
-| T016 | --check-config agrees with doctor on missing config | IN PROGRESS | cursor-check-config-missing-defaults-762f | native install sample-only |
+| T016 | --check-config agrees with doctor on missing config | DONE | cursor-check-config-missing-defaults-762f | native install sample-only |
