@@ -144,8 +144,9 @@ func runConsultQuery(env Env, fs flagset, cfg config.Config, q string, in *bufio
 		return 0
 	}
 	fmt.Fprintln(env.Stdout)
+	plan := res.Plan(snap)
 	if in == nil {
-		return promptConsultApply(env, fs, cfg, makePlan(q, snap))
+		return promptConsultApply(env, fs, cfg, plan)
 	}
-	return promptConsultApplyReader(env, fs, cfg, makePlan(q, snap), in)
+	return promptConsultApplyReader(env, fs, cfg, plan, in)
 }

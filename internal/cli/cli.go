@@ -226,6 +226,7 @@ Commands:
                       on --json, non-TTY, or MCP.
   plan [query]        Propose steps; no mutation.
                       Human session on stdout; --json or HAWKEYE_JSON=1 for apply.
+                      Steps are the lead playbook's stored commands, not a stub.
   apply [--dry-run|--yes] [plan.json]
                       Mutate. DEFAULT is dry-run. LLM never execs as root.
   doctor              Service health (config, perms, pidfile, deps, headroom)
@@ -310,36 +311,26 @@ func wantJSON(fs flagset, getenv func(string) string) bool {
 	return false
 }
 
-func makePlan(query string, snap probe.Snapshot) apply.Plan {
-	query = redact.String(query)
-	p := apply.Plan{ID: "consult-plan", Source: "knowledge", Summary: query}
-	if snap.RootRO {
-		p.Steps = []apply.Step{{
-			ID:         "1",
-			Action:     "unlock-rw",
-			Argv:       []string{"zfs", "set", "readonly=off", "<rootpool>"},
-			Privileged: true,
-		}}
-		p.Summary = "root is read-only; first skill is unlock-rw, not pkg"
-		return p
+func makePlan(query string, snap probe.Snapshot, st *knowledge.Store) apply.Plan {
+	res, err := consult.Run(query, snap, st, llm.None{})
+	if err != nil {
+		return consult.Result{Query: redact.String(query)}.Plan(snap)
 	}
-	p.Steps = []apply.Step{{
-		ID:     "1",
-		Action: "diagnose",
-		Argv:   []string{"echo", query},
-	}}
-	return p
+	return res.Plan(snap)
 }
 
 func cmdPlan(env Env, fs flagset, cfg config.Config) int {
-	_ = cfg
 	q := strings.Join(fs.rest, " ")
 	if q == "" {
 		b, _ := io.ReadAll(env.Stdin)
 		q = strings.TrimSpace(string(b))
 	}
 	snap := probe.Probe(env.Host)
-	p := makePlan(q, snap)
+	st := openKnowledge(env, cfg, snap)
+	if st != nil {
+		defer st.Close()
+	}
+	p := makePlan(q, snap, st)
 	if wantJSON(fs, env.Getenv) {
 		enc := json.NewEncoder(env.Stdout)
 		enc.SetIndent("", "  ")
@@ -467,7 +458,11 @@ func cmdMCP(env Env, fs flagset, cfg config.Config) int {
 			return consult.Run(q, snap, st, llm.None{})
 		},
 		Plan: func(q string) (any, error) {
-			return makePlan(q, snap), nil
+			st := openKnowledge(env, cfg, snap)
+			if st != nil {
+				defer st.Close()
+			}
+			return makePlan(q, snap, st), nil
 		},
 		Apply: func(p apply.Plan, yes bool) (any, error) {
 			mode := apply.ResolveMode(!yes, yes)

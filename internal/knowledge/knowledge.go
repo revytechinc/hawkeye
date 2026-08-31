@@ -5,6 +5,7 @@ package knowledge
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -39,10 +40,11 @@ type Store struct {
 }
 
 type Hit struct {
-	Title string  `json:"title"`
-	Body  string  `json:"body"`
-	Tags  string  `json:"tags,omitempty"`
-	Rank  float64 `json:"rank,omitempty"`
+	Title    string   `json:"title"`
+	Body     string   `json:"body"`
+	Tags     string   `json:"tags,omitempty"`
+	Rank     float64  `json:"rank,omitempty"`
+	Commands []string `json:"commands,omitempty"`
 }
 
 func SearchPaths(xdgDataHome, home string) []string {
@@ -195,7 +197,12 @@ func (s *Store) Search(query string, limit int) ([]Hit, error) {
 	}
 	q := `SELECT title, body, tags, rank FROM (` + strings.Join(parts, " UNION ALL ") + `) ORDER BY pri ASC, rank ASC LIMIT ?`
 	args = append(args, limit)
-	return s.searchTable(q, args...)
+	hits, err := s.searchTable(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	s.attachCommands(hits)
+	return hits, nil
 }
 
 func (s *Store) searchTable(q string, args ...any) ([]Hit, error) {
@@ -213,6 +220,66 @@ func (s *Store) searchTable(q string, args ...any) ([]Hit, error) {
 		hits = append(hits, h)
 	}
 	return hits, rows.Err()
+}
+
+func tableColumnExists(db *sql.DB, table, col string) bool {
+	if db == nil || !safeIdent(table) || !safeIdent(col) {
+		return false
+	}
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return false
+		}
+		if name == col {
+			return true
+		}
+	}
+	return false
+}
+
+func safeIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Store) attachCommands(hits []Hit) {
+	if s == nil || s.DB == nil || !s.playFTS || len(hits) == 0 {
+		return
+	}
+	if !tableColumnExists(s.DB, "playbooks", "commands") {
+		return
+	}
+	for i := range hits {
+		if hits[i].Title == "" {
+			continue
+		}
+		var raw string
+		err := s.DB.QueryRow(`SELECT commands FROM playbooks WHERE title = ?`, hits[i].Title).Scan(&raw)
+		if err != nil || strings.TrimSpace(raw) == "" {
+			continue
+		}
+		var cmds []string
+		if json.Unmarshal([]byte(raw), &cmds) != nil {
+			continue
+		}
+		hits[i].Commands = cmds
+	}
 }
 
 func CreateTestDB(path string) error {
@@ -233,5 +300,107 @@ func CreateTestDB(path string) error {
 		"If the root pool is imported readonly, first skill is unlock-rw, not pkg.",
 		"zfs rescue tier0",
 	)
+	return err
+}
+
+// RemountPlaybookTitle is the lead playbook used by jail e2e and tests.
+const RemountPlaybookTitle = "Remount ZFS root read-write"
+
+// RemountPlaybookCommands are the stored commands from hawkeye-data
+// playbooks/zfs-remount-rw.md (FAKE fixture; no secrets).
+func RemountPlaybookCommands() []string {
+	return []string{
+		"export PATH=/rescue:/sbin:/bin:/usr/sbin:/usr/bin",
+		"mount -p",
+		`zfs set readonly=off "$ROOTDS"`,
+		"mount -u -o rw /",
+	}
+}
+
+func remountPlaybookBody() string {
+	cmds := strings.Join(RemountPlaybookCommands(), "\n")
+	return "# Remount ZFS root read-write\n\nUse this when / is ZFS and mount shows read-only.\n\n## Commands\n\n```sh\n" + cmds + "\n```\n"
+}
+
+// CreatePlaybookTestDB writes a harvest-schema kit with the remount-ZFS
+// playbook (stored commands JSON + fenced body) and a decoy BE playbook.
+func CreatePlaybookTestDB(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	cmds, err := json.Marshal(RemountPlaybookCommands())
+	if err != nil {
+		return err
+	}
+	stmts := []string{
+		`CREATE TABLE playbooks (
+			rowid INTEGER PRIMARY KEY,
+			id TEXT NOT NULL UNIQUE,
+			title TEXT NOT NULL,
+			when_to_use TEXT NOT NULL,
+			commands TEXT NOT NULL DEFAULT '[]',
+			body TEXT NOT NULL
+		)`,
+		`CREATE VIRTUAL TABLE playbooks_fts USING fts5(
+			title, when_to_use, body, commands,
+			content='playbooks', content_rowid='rowid', tokenize='unicode61'
+		)`,
+		`CREATE TABLE documents (
+			rowid INTEGER PRIMARY KEY,
+			id TEXT NOT NULL UNIQUE,
+			title TEXT NOT NULL,
+			category TEXT,
+			body TEXT NOT NULL
+		)`,
+		`CREATE VIRTUAL TABLE documents_fts USING fts5(
+			title, category, body,
+			content='documents', content_rowid='rowid', tokenize='unicode61'
+		)`,
+	}
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			return err
+		}
+	}
+	if _, err := db.Exec(
+		`INSERT INTO playbooks(id, title, when_to_use, commands, body) VALUES (?, ?, ?, ?, ?)`,
+		"bectl-rollback",
+		"List, activate, or roll back a ZFS boot environment",
+		"Boot environments after an upgrade.",
+		`[]`,
+		"bectl list\n",
+	); err != nil {
+		return err
+	}
+	if _, err := db.Exec(
+		`INSERT INTO playbooks(id, title, when_to_use, commands, body) VALUES (?, ?, ?, ?, ?)`,
+		"zfs-remount-rw",
+		RemountPlaybookTitle,
+		"Root is a ZFS dataset and is mounted read-only (single-user, panic remount, zfs readonly=on, or a readonly pool import).",
+		string(cmds),
+		remountPlaybookBody(),
+	); err != nil {
+		return err
+	}
+	if _, err := db.Exec(
+		`INSERT INTO documents(id, title, category, body) VALUES (?, ?, ?, ?)`,
+		"zfs-emergency",
+		"ZFS emergency cheat sheet",
+		"docs",
+		"ZFS root mounted read-only after boot. Remount with zfs-remount-rw.",
+	); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`INSERT INTO playbooks_fts(rowid, title, when_to_use, body, commands)
+		SELECT rowid, title, when_to_use, body, commands FROM playbooks`); err != nil {
+		return err
+	}
+	_, err = db.Exec(`INSERT INTO documents_fts(rowid, title, category, body)
+		SELECT rowid, title, category, body FROM documents`)
 	return err
 }

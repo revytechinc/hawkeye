@@ -20,6 +20,39 @@ func TestFileDSN_AbsFallback(t *testing.T) {
 	}
 }
 
+func TestSafeIdentAndTableColumnExists(t *testing.T) {
+	if safeIdent("") || safeIdent("play books") || safeIdent("foo;bar") {
+		t.Fatal("unsafe identifiers must be rejected")
+	}
+	if !safeIdent("playbooks") || !safeIdent("commands") {
+		t.Fatal("safe identifiers")
+	}
+	if tableColumnExists(nil, "playbooks", "commands") {
+		t.Fatal("nil db")
+	}
+	if tableColumnExists(nil, "playbooks;drop", "commands") {
+		t.Fatal("unsafe table")
+	}
+	dir := t.TempDir()
+	if err := CreatePlaybookTestDB(filepath.Join(dir, DBName)); err != nil {
+		t.Fatal(err)
+	}
+	st, err := Open([]string{dir}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if !tableColumnExists(st.DB, "playbooks", "commands") {
+		t.Fatal("commands column")
+	}
+	if tableColumnExists(st.DB, "playbooks", "nope") {
+		t.Fatal("missing column")
+	}
+	if tableColumnExists(st.DB, "missing_table", "x") {
+		t.Fatal("missing table")
+	}
+}
+
 func TestOpen_sqlOpenFailsContinues(t *testing.T) {
 	dir := t.TempDir()
 	if err := CreateTestDB(filepath.Join(dir, DBName)); err != nil {

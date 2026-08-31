@@ -485,3 +485,71 @@ present; no-args documented as the panic path in `hawkeye(8)`.
 
 `CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
 
+## 16. Plan from lead playbook stored commands (2026-08-31)
+
+T018: `hawkeye plan` (and the TTY consult apply path) must turn the lead
+consult playbook into apply steps using stored commands (playbooks.commands
+JSON, else fenced body). No `echo <query>` stub. RootRO without a playbook
+still keeps unlock-rw as the first skill. `--json` stays machine-shaped.
+Apply remains dry-run by default; `--yes` (or TTY second y) to land.
+
+Red (`makePlan` still stubbed):
+
+```
+# github.com/revytechinc/hawkeye/internal/consult_test
+internal/consult/plan_test.go:23:9: r.Plan undefined
+--- FAIL: TestSearch_PlaybookCommandsFromStore
+    stored commands missing from hit: []string(nil)
+--- FAIL: TestPlan_UsesPlaybookNotEchoStub
+    plan must use stored remount command (got unlock-rw <rootpool>)
+--- FAIL: TestPlan_HumanShowsStoredCommands
+    1. diagnose
+       echo ZFS root is read-only after boot
+--- FAIL: TestConsult_TTY_ApplyDryRunsPlaybook
+    dry-run: zfs set readonly=off <rootpool>
+--- FAIL: TestSysExecutor_StoredShellLine
+    exec: "echo hawkeye-shell && echo ok": executable file not found
+```
+
+Green: `go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply      coverage: 98.8%
+ok  github.com/revytechinc/hawkeye/internal/cli        coverage: 83.2%
+ok  github.com/revytechinc/hawkeye/internal/consult    coverage: 96.8%
+ok  github.com/revytechinc/hawkeye/internal/knowledge  coverage: 87.2%
+ok  github.com/revytechinc/hawkeye/internal/redact     coverage: 100.0%
+total: (statements) 87.7%
+```
+
+`consult.Result.Plan` 100%. `CommandLines` 100%. `apply.ResolveMode` 100%.
+`SysExecutor.Run` 100% (stored playbook lines run via `/bin/sh -c`).
+Redact remains 100%. Tests use FAKE fixtures only.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye apply` without `--yes`: `"dry_run": true`, `"applied": false`.
+`hawkeye --json doctor` (no kit): UNHEALTHY, GPU absent ok. Exit 1.
+
+Fixture kit (query `ZFS root is read-only after boot`):
+
+```
+$ hawkeye plan --json 'ZFS root is read-only after boot'
+{
+  "id": "consult-plan",
+  "source": "knowledge",
+  "summary": "Remount ZFS root read-write",
+  "steps": [
+    {"id":"1","action":"export","argv":["export PATH=/rescue:/sbin:/bin:/usr/sbin:/usr/bin"],"privileged":true},
+    {"id":"2","action":"mount","argv":["mount -p"],"privileged":true},
+    {"id":"3","action":"zfs","argv":["zfs set readonly=off \"$ROOTDS\""],"privileged":true},
+    {"id":"4","action":"mount","argv":["mount -u -o rw /"],"privileged":true}
+  ]
+}
+```
+
+TTY consult + `y` dry-runs those stored lines (not `echo <query>`).
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros present
+(Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS FILES KEYS
+ENVIRONMENT SEE ALSO). `plan` documents stored playbook commands.
