@@ -300,3 +300,56 @@ func TestEditPlan_UsesTempDir(t *testing.T) {
 		t.Fatalf("temp path %q dir %q", saw, dir)
 	}
 }
+
+func TestMCPApply_UnprivilegedYesRunsProcess(t *testing.T) {
+	got, err := mcpApply(Env{}, config.Config{}, apply.Plan{
+		ID:     "p",
+		Source: "operator",
+		Steps:  []apply.Step{{ID: "1", Action: "echo", Argv: []string{"echo", "hawkeye-mcp-real-exec"}}},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, ok := got.(apply.Result)
+	if !ok {
+		t.Fatalf("%T", got)
+	}
+	if res.DryRun || !res.Applied {
+		t.Fatalf("%+v", res)
+	}
+	if len(res.Steps) != 1 || !strings.Contains(res.Steps[0].Output, "hawkeye-mcp-real-exec") {
+		t.Fatalf("must run SysExecutor, not CountingExecutor: %+v", res)
+	}
+}
+
+func TestMCPApply_PrivilegedYesDryRun(t *testing.T) {
+	ex := &apply.CountingExecutor{}
+	got, err := mcpApply(Env{Exec: ex}, config.Config{}, apply.Plan{
+		ID:     "p",
+		Source: "knowledge",
+		Steps:  []apply.Step{{ID: "1", Privileged: true, Argv: []string{"echo", "hawkeye-mcp-real-exec"}}},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := got.(apply.Result)
+	if !res.DryRun || res.Applied {
+		t.Fatalf("privileged MCP stays dry-run: %+v", res)
+	}
+	if ex.Calls != 0 {
+		t.Fatal(ex.Calls)
+	}
+}
+
+func TestMCPApply_NoYesIsDryRun(t *testing.T) {
+	got, err := mcpApply(Env{}, config.Config{}, apply.Plan{
+		Steps: []apply.Step{{ID: "1", Argv: []string{"echo", "hawkeye-mcp-real-exec"}}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := got.(apply.Result)
+	if !res.DryRun || res.Applied {
+		t.Fatalf("%+v", res)
+	}
+}

@@ -270,8 +270,16 @@ func TestConsult_TTY_YesThenYesLandsAndAudits(t *testing.T) {
 	if !strings.Contains(out, "Apply for real? [y/N]") {
 		t.Fatalf("second confirm: %s", out)
 	}
-	if ex.Calls != len(knowledge.RemountPlaybookCommands()) {
+	want := knowledge.RemountPlaybookCommands()
+	if ex.Calls != len(want) {
 		t.Fatalf("land calls=%d out=%s", ex.Calls, out)
+	}
+	got := make([]string, 0, len(ex.Argv))
+	for _, a := range ex.Argv {
+		got = append(got, strings.Join(a, " "))
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("y/y must land printed playbook argv, not echo stub or <rootpool>: got %q want %q", got, want)
 	}
 	b, errRead := os.ReadFile(auditPath)
 	if errRead != nil {

@@ -194,7 +194,19 @@ Public URL:
 GET is Server-Sent Events after authentication; POST is JSON-RPC.
 Missing or wrong token returns HTTP 401.
 The token is never written to logs or documentation.
-MCP tools use the same plan/apply gate.
+MCP tools use the same plan/apply gate as the operator CLI:
+the same executor and audit log.
+Unprivileged
+.Cm apply
+still requires
+.Cm yes
+.Pq the
+.Fl -yes
+gate
+.Ns .
+Privileged MCP apply stays dry-run even when
+.Cm yes
+is set.
 .It Nm update
 Refresh knowledge artifacts from
 .Nm hawkeye-data
@@ -276,6 +288,14 @@ Root writable, islanded.
 CPU embedder if RAM allows.
 .It 2
 Network up.
+Carrier is a non-loopback interface from getifaddrs,
+.Dv SIOCGIFMEDIA ,
+or
+.Nm ifconfig
+.Dq status: active .
+Linux
+.Pa /sys/class/net
+is not the FreeBSD probe.
 May escalate large jobs to a remote LLM.
 GPU is used if it works and is not required otherwise.
 .El

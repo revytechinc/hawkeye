@@ -553,3 +553,59 @@ TTY consult + `y` dry-runs those stored lines (not `echo <query>`).
 `mandoc` not installed here. Equivalent mdoc lint: required macros present
 (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS FILES KEYS
 ENVIRONMENT SEE ALSO). `plan` documents stored playbook commands.
+
+## 17. Reviewer blockers: playbook argv, FreeBSD carrier, MCP apply (2026-08-31)
+
+T018 on main (PR 15, `c560e8e`) already builds TTY consult apply from
+stored playbook commands. Added `TestConsult_TTY_YesAppliesPrintedPlaybookArgv`
+so `y` must land `argv ==` the printed playbook lines, not `echo <query>`
+and not `zfs set readonly=off <rootpool>`.
+
+T019: `NetworkCarrier` no longer dies on missing Linux `/sys`. Tests
+parse `ifconfig(8)` fixtures and inject `IfaceStatus` (no fake `/sys`).
+`host_freebsd.go` uses getifaddrs + `SIOCGIFMEDIA`, then `ifconfig -a`.
+
+T020: MCP `apply` uses CLI `SysExecutor` + auditor. Unprivileged + `yes`
+must emit real `echo` output (CountingExecutor's `ok` fails the test).
+Privileged MCP stays dry-run. Default dry-run; `--dry-run` wins over `--yes`.
+
+Red (before the wiring):
+
+```
+--- FAIL: TestDefaultHost_FreeBSDCarrierWithoutSysfs
+    absent /sys must still see FreeBSD em0 carrier
+--- FAIL: TestParseIfconfig_Em0ActiveIgnoresLoopback
+    ParseIfconfig undefined
+--- FAIL: TestMCP_UnprivilegedYesUsesRealExecutor
+    Apply claimed success without a real executor (CountingExecutor returns ok, no process)
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply      coverage: 98.8%
+ok  github.com/revytechinc/hawkeye/internal/cli        coverage: 84.5%
+ok  github.com/revytechinc/hawkeye/internal/consult    coverage: 96.8%
+ok  github.com/revytechinc/hawkeye/internal/probe      coverage: 91.7%
+ok  github.com/revytechinc/hawkeye/internal/redact     coverage: 100.0%
+total: (statements) 88.5%
+```
+
+`consult.Result.Plan` 100%. `CommandLines` 100%. `mcpApply` 100%.
+`executePlanActor` 100%. `CarrierUp` 100%. `IfmediaActive` 100%.
+`ParseIfconfig` 100%. `NetworkCarrier` 100%. `sysfsCarrier` 100%.
+`apply.ResolveMode` 100%. Redact 100%. Tests use FAKE fixtures only.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye apply` without `--yes`: `"dry_run": true`, `"applied": false`.
+`hawkeye apply --dry-run --yes`: `"dry_run": true` (`--dry-run` wins).
+`hawkeye --json doctor` (no kit): UNHEALTHY (knowledge missing), GPU
+absent ok. Exit 1. Doctor `tier` can be 2 when a non-loopback iface
+has carrier (getifaddrs fallback; not stuck at 1 by missing `/sys`).
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS
+FILES SEE ALSO). Tier 2 documents getifaddrs / SIOCGIFMEDIA / ifconfig.
