@@ -30,7 +30,7 @@ func inspectRC(r *Report, src Sources) {
 		if err != nil {
 			continue
 		}
-		cmd := rcCommand(string(body))
+		cmd := rcCommand(string(body), name)
 		if cmd == "" || cmd == "daemon" {
 			continue
 		}
@@ -132,7 +132,7 @@ func findRCScript(src Sources, name string) (string, bool) {
 	return "", false
 }
 
-func rcCommand(body string) string {
+func rcCommand(body, scriptName string) string {
 	for _, line := range strings.Split(body, "\n") {
 		trim := strings.TrimSpace(line)
 		if trim == "" || strings.HasPrefix(trim, "#") {
@@ -141,15 +141,54 @@ func rcCommand(body string) string {
 		if strings.HasPrefix(trim, "command=") || strings.HasPrefix(trim, "procname=") {
 			_, val, ok := splitAssign(trim)
 			if ok {
-				return val
+				return expandRCSubrName(val, scriptName)
 			}
 		}
 	}
 	return ""
 }
 
+// expandRCSubrName applies the same ${name}/$name substitution rc.subr
+// uses before exec: name is the rc.d script basename.
+func expandRCSubrName(cmd, name string) string {
+	if name == "" || cmd == "" {
+		return cmd
+	}
+	cmd = strings.ReplaceAll(cmd, "${name}", name)
+	return expandDollarName(cmd, name)
+}
+
+func expandDollarName(cmd, name string) string {
+	const tok = "$name"
+	var b strings.Builder
+	for i := 0; i < len(cmd); {
+		if strings.HasPrefix(cmd[i:], tok) {
+			end := i + len(tok)
+			if end == len(cmd) || !isRCIdent(cmd[end]) {
+				b.WriteString(name)
+				i = end
+				continue
+			}
+		}
+		b.WriteByte(cmd[i])
+		i++
+	}
+	return b.String()
+}
+
+func isRCIdent(c byte) bool {
+	return c == '_' ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= 'a' && c <= 'z') ||
+		(c >= '0' && c <= '9')
+}
+
 func rcBinaryMissing(src Sources, cmd string) bool {
 	if cmd == "" || !strings.Contains(cmd, "/") {
+		return false
+	}
+	if strings.Contains(cmd, "$") {
+		// Other rc.subr vars are unresolved; diagnose-only — do not guess.
 		return false
 	}
 	if src.exists(cmd) {

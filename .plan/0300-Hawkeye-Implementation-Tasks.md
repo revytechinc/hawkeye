@@ -28,4 +28,5 @@
 | T019 | FreeBSD NetworkCarrier (not Linux sysfs) | DONE | cursor/pkg-reviewer-blockers-2150 | ifconfig/ioctl/getifaddrs; Probe can reach tier 2 |
 | T020 | MCP apply uses CLI SysExecutor + auditor | DONE | cursor/pkg-reviewer-blockers-2150 | unprivileged+yes must exec; privileged stays dry-run |
 | T021 | Panic-path apply: shell env, fail≠applied, RO audit, redact-after-parse | DONE | cursor/panic-path-apply-blockers-2072 | ROOTDS persists; step fail exits 1; audit degrades on RO /var; plan JSON parsed then redacted |
-| T022 | Host first-look before session `>` | IN PROGRESS | cursor/host-first-look-session-b2ff | panic path inspects HOST (fstab/rc/zpool/net/disk); not doctor; compose with T021 |
+| T022 | Host first-look before session `>` | DONE | cursor/host-first-look-session-b2ff | panic path inspects HOST (fstab/rc/zpool/net/disk); not doctor; compose with T021 |
+| T023 | inspect expands rc.subr `${name}` in command= | IN PROGRESS | cursor/inspect-rc-name-expand-c049 | live jail false-positive sshd missing; isolate plan tests from live kit |

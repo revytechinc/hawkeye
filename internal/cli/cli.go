@@ -277,10 +277,10 @@ func cmdInit(env Env, fs flagset, _ config.Config) int {
 }
 
 func knowledgePaths(env Env, cfg config.Config) []string {
-	var paths []string
 	if extra := env.Getenv("HAWKEYE_KNOWLEDGE_PATH"); extra != "" {
-		paths = append(paths, extra)
+		return []string{extra}
 	}
+	var paths []string
 	paths = append(paths, cfg.Knowledge.Paths...)
 	xdg := env.Getenv("XDG_DATA_HOME")
 	home, _ := os.UserHomeDir()
