@@ -14,57 +14,106 @@ import (
 	"github.com/revytechinc/hawkeye/internal/probe"
 )
 
-func TestHuman_OperatorSessionNotJSON(t *testing.T) {
-	r := consult.Result{
-		Query:      "ZFS root is read-only after boot",
-		Tier:       0,
-		FirstSkill: "unlock-rw",
-		Hits: []knowledge.Hit{{
+func jailOrderHits() []knowledge.Hit {
+	return []knowledge.Hit{
+		{Title: "List, activate, or roll back a ZFS boot environment", Tags: "Boot environments after an upgrade."},
+		{Title: "Single-user versus multi-user", Tags: "Choose a runlevel."},
+		{Title: "Import a ZFS pool (readonly first, then unlock)", Tags: "Pool is not imported yet."},
+		{
 			Title: "Remount ZFS root read-write",
-			Tags:  "Root is a ZFS dataset and is mounted read-only after boot.",
+			Tags:  "Root is a ZFS dataset and is mounted read-only (single-user, panic remount, zfs readonly=on, or a readonly pool import).",
 			Body: `# Remount ZFS root read-write
 
 Use this when / is ZFS and mount shows read-only.
 
 ## Commands
 
-` + "```sh\n" + `export PATH=/rescue:/sbin:/bin
+` + "```sh\n" + `export PATH=/rescue:/sbin:/bin:/usr/sbin:/usr/bin
+mount -p
 zfs set readonly=off "$ROOTDS"
 mount -u -o rw /
 ` + "```\n",
-			Rank: -1.25,
-		}},
-		Notes: []string{"root is read-only; consult does not write; first skill is unlock-rw, not pkg"},
+			Rank: 4,
+		},
+	}
+}
+
+func TestHuman_LeadsWithActionablePlaybook(t *testing.T) {
+	r := consult.Result{
+		Query: "ZFS root is read-only after boot",
+		Tier:  1,
+		Hits:  jailOrderHits(),
+		Notes: []string{"llm skipped: local llm model is not configured"},
 	}
 	got := r.Human()
-	if strings.TrimSpace(got) == "" {
-		t.Fatal("empty human output")
-	}
 	if strings.HasPrefix(strings.TrimSpace(got), "{") {
 		t.Fatalf("human output must not be a JSON blob:\n%s", got)
 	}
-	for _, key := range []string{`"Title"`, `"when_to_use"`, `"score"`, `"query":`, `"hits"`} {
-		if strings.Contains(got, key) {
-			t.Fatalf("human output leaked JSON key %s:\n%s", key, got)
+	for _, junk := range []string{
+		`"Title"`, `"when_to_use"`, `"score"`, `"query":`, `"hits"`, `"Tags"`, `"Rank"`,
+		"llm skipped", "tier ", "consult  ",
+	} {
+		if strings.Contains(got, junk) {
+			t.Fatalf("human TTY leaked %q:\n%s", junk, got)
 		}
 	}
-	if !strings.Contains(got, "ZFS root is read-only after boot") {
-		t.Fatalf("query missing:\n%s", got)
+	lead := strings.TrimSpace(got)
+	if !strings.HasPrefix(lead, "Remount ZFS root read-write\n") {
+		t.Fatalf("must lead with the actionable playbook, not FTS order:\n%s", got)
 	}
-	if !strings.Contains(got, "Remount ZFS root read-write") {
-		t.Fatalf("title missing:\n%s", got)
-	}
-	if !strings.Contains(got, "Root is a ZFS dataset and is mounted read-only after boot.") {
+	if !strings.Contains(got, "Root is a ZFS dataset and is mounted read-only") {
 		t.Fatalf("summary missing:\n%s", got)
 	}
-	if !strings.Contains(got, `export PATH=/rescue:/sbin:/bin`) {
+	if !strings.Contains(got, `export PATH=/rescue:/sbin:/bin:/usr/sbin:/usr/bin`) {
 		t.Fatalf("playbook command missing:\n%s", got)
 	}
-	if !strings.Contains(got, `zfs set readonly=off "$ROOTDS"`) {
+	if !strings.Contains(got, "mount -p") {
 		t.Fatalf("playbook command missing:\n%s", got)
 	}
-	if strings.Contains(got, "```") {
-		t.Fatalf("fences should be unwrapped so commands look typed:\n%s", got)
+	if strings.Contains(got, "```") || strings.Contains(got, "## Commands") {
+		t.Fatalf("markdown chrome leaked:\n%s", got)
+	}
+	also := strings.Index(got, "also:")
+	if also < 0 {
+		t.Fatalf("related titles missing:\n%s", got)
+	}
+	rest := got[also:]
+	for _, title := range []string{
+		"List, activate, or roll back a ZFS boot environment",
+		"Single-user versus multi-user",
+		"Import a ZFS pool (readonly first, then unlock)",
+	} {
+		if !strings.Contains(rest, title) {
+			t.Fatalf("also: missing %q:\n%s", title, got)
+		}
+	}
+	if strings.Contains(rest, "Remount ZFS root read-write") {
+		t.Fatalf("lead title repeated under also:\n%s", got)
+	}
+}
+
+func TestHuman_JSONKeepsFTSOrder(t *testing.T) {
+	r := consult.Result{Query: "ZFS root is read-only after boot", Hits: jailOrderHits()}
+	b, err := r.JSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid(b) {
+		t.Fatalf("invalid JSON: %s", b)
+	}
+	var decoded struct {
+		Hits []struct {
+			Title string `json:"title"`
+		} `json:"hits"`
+	}
+	if err := json.Unmarshal(b, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Hits) < 4 || decoded.Hits[0].Title != "List, activate, or roll back a ZFS boot environment" {
+		t.Fatalf("--json must keep FTS order: %#v", decoded.Hits)
+	}
+	if decoded.Hits[3].Title != "Remount ZFS root read-write" {
+		t.Fatalf("remount should stay 4th in JSON: %#v", decoded.Hits)
 	}
 }
 
@@ -85,17 +134,17 @@ func TestHuman_RedactsSecrets(t *testing.T) {
 	}
 }
 
-func TestHuman_EmptyHitsStillShowsQuery(t *testing.T) {
+func TestHuman_EmptyHitsNotJSON(t *testing.T) {
 	r, err := consult.Run("hello", probe.Snapshot{Tier: 0, RootRO: true}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := r.Human()
-	if !strings.Contains(got, "hello") {
-		t.Fatalf("query missing:\n%s", got)
-	}
 	if strings.HasPrefix(strings.TrimSpace(got), "{") {
 		t.Fatalf("must not be JSON:\n%s", got)
+	}
+	if strings.Contains(got, `"query":`) || strings.Contains(got, "llm skipped") {
+		t.Fatalf("empty-hit TTY leaked machine chrome:\n%s", got)
 	}
 }
 
@@ -114,40 +163,34 @@ func TestHuman_IncludesLLMTextWithoutJSONKeys(t *testing.T) {
 	}
 }
 
-func TestHuman_EmptyQueryAndUntitledHit(t *testing.T) {
+func TestHuman_UntitledHit(t *testing.T) {
 	r := consult.Result{
 		Query: "   ",
 		Tier:  2,
 		Hits:  []knowledge.Hit{{Title: "", Body: "plain stored body", Tags: ""}},
-		Notes: []string{"", "knowledge store unavailable; FTS skipped"},
+		Notes: []string{"", "llm skipped: local llm model is not configured"},
 	}
 	got := r.Human()
-	if !strings.Contains(got, "(empty query)") {
-		t.Fatalf("empty query chrome missing:\n%s", got)
-	}
 	if !strings.Contains(got, "untitled") {
 		t.Fatalf("untitled fallback missing:\n%s", got)
 	}
 	if !strings.Contains(got, "plain stored body") {
 		t.Fatalf("body missing:\n%s", got)
 	}
-	if !strings.Contains(got, "knowledge store unavailable") {
-		t.Fatalf("note missing:\n%s", got)
+	if strings.Contains(got, "llm skipped") || strings.Contains(got, "(empty query)") {
+		t.Fatalf("chrome leaked:\n%s", got)
 	}
 }
 
 func TestHuman_TildeFenceAndNonMatchingHeading(t *testing.T) {
 	r := consult.Result{
-		Query: "ufs",
+		Query: "ufs remount",
 		Hits: []knowledge.Hit{{
 			Title: "Remount UFS",
 			Body:  "# Other heading\n\n~~~\nmount -u -o rw /\n~~~\n",
 		}},
 	}
 	got := r.Human()
-	if !strings.Contains(got, "Other heading") {
-		t.Fatalf("non-matching heading must stay:\n%s", got)
-	}
 	if !strings.Contains(got, "mount -u -o rw /") {
 		t.Fatalf("tilde-fenced command missing:\n%s", got)
 	}
@@ -171,6 +214,26 @@ func TestHuman_EmptyBodyAndEmptyLLMText(t *testing.T) {
 	}
 }
 
+func TestHuman_ProseWhenAndKeywordTags(t *testing.T) {
+	r := consult.Result{
+		Query: "geli attach",
+		Hits: []knowledge.Hit{{
+			Title: "Attach a geli provider",
+			Tags:  "Use this when the provider is locked at the console",
+			Body:  "geli attach -k /boot/keys/root.key da0",
+		}},
+	}
+	got := r.Human()
+	if !strings.Contains(got, "Use this when the provider is locked") {
+		t.Fatalf("when-to-use prose missing:\n%s", got)
+	}
+	r.Hits[0].Tags = "zfs rescue tier0 boot environment kit extra tokens"
+	got = r.Human()
+	if strings.Contains(got, "zfs rescue tier0") {
+		t.Fatalf("keyword tags must not print as a summary:\n%s", got)
+	}
+}
+
 func TestHuman_TitleOnlyBody(t *testing.T) {
 	r := consult.Result{
 		Query: "x",
@@ -179,19 +242,5 @@ func TestHuman_TitleOnlyBody(t *testing.T) {
 	got := r.Human()
 	if !strings.Contains(got, "Only title") {
 		t.Fatalf("title missing:\n%s", got)
-	}
-}
-
-func TestJSON_StillMachineObject(t *testing.T) {
-	r := consult.Result{Query: "zfs", Hits: []knowledge.Hit{{Title: "Remount ZFS root read-write"}}}
-	b, err := r.JSON()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !json.Valid(b) {
-		t.Fatalf("invalid JSON: %s", b)
-	}
-	if !strings.Contains(string(b), `"query"`) {
-		t.Fatalf("JSON missing query: %s", b)
 	}
 }

@@ -30,13 +30,10 @@ func TestConsult_DefaultIsHumanNotJSON(t *testing.T) {
 	} else {
 		t.Fatalf("default consult dumped JSON:\n%s", out)
 	}
-	for _, key := range []string{`"Title"`, `"when_to_use"`, `"query":`, `"hits"`} {
+	for _, key := range []string{`"Title"`, `"when_to_use"`, `"query":`, `"hits"`, "llm skipped", "tier "} {
 		if strings.Contains(out, key) {
-			t.Fatalf("default consult leaked JSON key %s:\n%s", key, out)
+			t.Fatalf("default consult leaked %s:\n%s", key, out)
 		}
-	}
-	if !strings.Contains(out, "ZFS root is read-only after boot") {
-		t.Fatalf("query missing from human session:\n%s", out)
 	}
 	if !strings.Contains(out, "ZFS readonly pool") {
 		t.Fatalf("hit title missing:\n%s", out)
