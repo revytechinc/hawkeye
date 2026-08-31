@@ -83,7 +83,10 @@ make install-rescue
 The port option `RESCUE` is off by default (thin bastille jails often have
 `/rescue` as a dangling symlink). Live `make install-rescue` writes `/rescue`
 only when it is a real directory; `/boot/hawkeye` is created when `/boot`
-exists. Knowledge sqlite is not vendored here; hawkeye-data owns the dual
+exists and is writable. A read-only `/boot` (bastille symlink to a release
+boot; EROFS/EACCES/EPERM) is skipped the same way as dangling `/rescue`.
+The install does not remount `/boot`.
+Knowledge sqlite is not vendored here; hawkeye-data owns the dual
 prefix. `misc/llama-cpp` is optional and not a package dependency.
 
 Configuration is JSON (RFC 8259) under `/usr/local/etc/cloudbsd/hawkeye/` or

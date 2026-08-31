@@ -883,3 +883,52 @@ still stages. `make install-rescue` with a fixture dangling symlink
 printed `skip … (not a real directory)` and created `/boot/hawkeye`.
 DESTDIR stage still wrote `/rescue/hawkeye`. Tests do not remount ZFS
 `/`. knowledge embeddings table (0 rows) is unused; no corpus vendored.
+
+## 22. install-rescue skip RO /boot (2026-08-31)
+
+T025. Product jail after pkg of SHA c5e6414b: `make install-rescue`
+skipped dangling `/rescue` then died exit 71 on
+`mkdir /boot/hawkeye` EROFS. Jail `/boot` is a bastille symlink to a
+read-only release boot. Do not remount.
+
+Red (before `StageBootKit` / Makefile skip):
+
+```
+# undefined: knowledge.StageBootKit
+# undefined: knowledge.IsReadOnlyCreateError
+# Makefile missing EROFS/EACCES/EPERM skip
+--- FAIL: TestMakefileInstallRescue
+    layout_test.go: Makefile must DESTDIR-stage, skip dangling /rescue,
+    and skip RO /boot (EROFS missing)
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+IsReadOnlyCreateError  100.0%
+BootKitSkipMessage     100.0%
+StageBootKit           100.0%
+CanStageBootKit        100.0%
+CanStageRescue         100.0%
+realDir                100.0%
+knowledge package      89.4%
+redact                 100.0%
+total                  88.7%
+```
+
+Fake RO dest (chmod 0555 `/boot`) skips with
+`install-rescue: skip … (read-only)` and exit 0. Injected EROFS, EACCES,
+and EPERM skip; ENOSPC still fails. DESTDIR stage still creates both
+`/rescue/hawkeye` and `/boot/hawkeye`. DESTDIR + RO dest is an error, not
+a live skip. Tests do not remount ZFS or the jail `/boot`.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing, GPU
+absent ok. Exit 1.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO). RO `/boot` skip is documented. No hawkeye-www.

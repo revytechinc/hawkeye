@@ -34,10 +34,13 @@ func TestMakefileInstallRescue(t *testing.T) {
 		t.Fatal(err)
 	}
 	mk := string(b)
-	for _, want := range []string{"install-rescue", "DESTDIR", "/rescue", "/boot/hawkeye", "! -L"} {
+	for _, want := range []string{"install-rescue", "DESTDIR", "/rescue", "/boot/hawkeye", "! -L", "EROFS", "EACCES", "EPERM", "read-only"} {
 		if !strings.Contains(mk, want) {
-			t.Fatalf("Makefile must DESTDIR-stage and skip dangling /rescue (%s missing)", want)
+			t.Fatalf("Makefile must DESTDIR-stage, skip dangling /rescue, and skip RO /boot (%s missing)", want)
 		}
+	}
+	if !strings.Contains(mk, "skip $(BOOT_HAWKEYE) (read-only)") {
+		t.Fatal("RO /boot skip message must match skip /rescue style")
 	}
 	port, err := os.ReadFile(filepath.Join(root, "ports", "sysutils", "hawkeye", "Makefile"))
 	if err != nil {
