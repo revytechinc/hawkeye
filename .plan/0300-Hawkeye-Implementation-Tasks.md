@@ -33,3 +33,4 @@
 | T024 | Rescue layout install | DONE | cursor/core-llm-update-rescue-d1e7 | make install-rescue; port RESCUE; /rescue + /boot/hawkeye |
 | T025 | install-rescue skip RO /boot | DONE | cursor/skip-ro-boot-install-rescue-79b6 | EROFS/EACCES/EPERM skip like /rescue; DESTDIR still creates both |
 | T026 | sqlite-vec / vector search when RAM allows | DONE | cursor/knowledge-sqlite-vec-63f0 | FTS if embeddings empty; local embedder only; no cloud; no GGUF vendored |
+| T027 | install-rescue bmake set -e mkdir | DONE | cursor/bmake-install-rescue-set-e-c3b6 | \|\| _boot_rc so bmake set -e does not abort RO skip; DESTDIR still creates / fails |

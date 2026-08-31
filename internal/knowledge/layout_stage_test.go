@@ -241,6 +241,77 @@ func TestStageBootKit_DESTDIRFakeRODestIsError(t *testing.T) {
 	}
 }
 
+func readRootMakefile(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+func fakeROBootKit(t *testing.T) (kit string, cleanup func()) {
+	t.Helper()
+	dir := t.TempDir()
+	boot := filepath.Join(dir, "boot")
+	if err := os.Mkdir(boot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	kit = filepath.Join(boot, "hawkeye")
+	if err := os.Chmod(boot, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	return kit, func() { _ = os.Chmod(boot, 0o755) }
+}
+
+// liveBootMkdirShell extracts the Makefile live /boot/hawkeye mkdir + skip
+// block and turns it into a /bin/sh script. Tests run it under set -e so
+// GNU make cannot hide the bmake abort.
+func liveBootMkdirShell(mk, bootHawkeye string) (string, error) {
+	lines := strings.Split(mk, "\n")
+	start := -1
+	for i, line := range lines {
+		if strings.Contains(line, "_boot_err=") && strings.Contains(line, "mkdir") {
+			start = i
+			if i > 0 && strings.Contains(lines[i-1], "_boot_rc=0") {
+				start = i - 1
+			}
+			break
+		}
+	}
+	if start < 0 {
+		return "", os.ErrNotExist
+	}
+	var body []string
+	depth := 0
+	sawIf := false
+	for _, line := range lines[start:] {
+		trim := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(line), "\\"))
+		trim = strings.ReplaceAll(trim, "$$", "$")
+		trim = strings.ReplaceAll(trim, "$(BOOT_HAWKEYE)", bootHawkeye)
+		trim = strings.ReplaceAll(trim, "$(KNOWLEDGE_SRC)", "")
+		body = append(body, trim)
+		if strings.HasPrefix(trim, "if ") {
+			depth++
+			sawIf = true
+		}
+		if strings.HasPrefix(trim, "fi") {
+			depth--
+			if sawIf && depth == 0 {
+				break
+			}
+		}
+	}
+	if !sawIf {
+		return "", os.ErrInvalid
+	}
+	return strings.Join(body, "\n"), nil
+}
+
 func makeInstallRescue(t *testing.T, extra ...string) (string, error) {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -298,6 +369,108 @@ func TestMakefileInstallRescue_FakeRODestExit0(t *testing.T) {
 	}
 	if _, err := os.Stat(kit); !os.IsNotExist(err) {
 		t.Fatal("must not create /boot/hawkeye on RO dest")
+	}
+}
+
+func TestUnguardedMkdirCommandSubDiesUnderSetE(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("chmod 0555 is still writable as root")
+	}
+	kit, cleanup := fakeROBootKit(t)
+	defer cleanup()
+
+	// PR 21 idiom. bmake recipes run with set -e, so this aborts before
+	// skip. GNU make on CI hid the product exit 1.
+	script := "set -e\n_boot_err=$(mkdir -m 0755 " + shellQuote(kit) + " 2>&1)\n_boot_rc=$?\necho skip-never-reached\n"
+	out, err := exec.Command("sh", "-c", script).CombinedOutput()
+	if err == nil {
+		t.Fatal("unguarded $(mkdir) must die under set -e so tests catch the bmake trap")
+	}
+	if strings.Contains(string(out), "skip-never-reached") {
+		t.Fatalf("set -e must abort before skip logic: %s", out)
+	}
+}
+
+func TestMakefileInstallRescue_SetEDoesNotAbortOnROMkdir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("chmod 0555 is still writable as root")
+	}
+	kit, cleanup := fakeROBootKit(t)
+	defer cleanup()
+
+	recipe, err := liveBootMkdirShell(readRootMakefile(t), kit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command("sh", "-c", "set -e\n"+recipe).CombinedOutput()
+	got := string(out)
+	if err != nil {
+		t.Fatalf("Makefile mkdir capture must survive set -e on RO dest (bmake): %v\n%s\nrecipe:\n%s", err, got, recipe)
+	}
+	if !strings.Contains(got, "skip "+kit+" (read-only)") {
+		t.Fatalf("RO skip must run after guarded mkdir: %s\nrecipe:\n%s", got, recipe)
+	}
+	if _, err := os.Stat(kit); !os.IsNotExist(err) {
+		t.Fatal("must not create /boot/hawkeye on RO dest")
+	}
+}
+
+func TestMakefileInstallRescue_ExistingFileFails(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	dir := t.TempDir()
+	boot := filepath.Join(dir, "boot")
+	if err := os.Mkdir(boot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	if err := os.WriteFile(kit, []byte("not-a-dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Symlink(filepath.Join(dir, "missing"), rescue); err != nil {
+		t.Fatal(err)
+	}
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+kit,
+		"DESTDIR=",
+	)
+	if err == nil {
+		t.Fatalf("EEXIST/not-a-dir must fail the target, not skip as read-only\n%s", out)
+	}
+	if strings.Contains(out, "skip "+kit+" (read-only)") {
+		t.Fatalf("real mkdir error is not a live RO skip: %s", out)
+	}
+}
+
+func TestMakefileInstallRescue_DESTDIRRODestFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("chmod 0555 is still writable as root")
+	}
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	dir := t.TempDir()
+	stage := filepath.Join(dir, "stage")
+	if err := os.Mkdir(stage, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(stage, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(stage, 0o755) })
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"DESTDIR="+stage,
+	)
+	if err == nil {
+		t.Fatalf("DESTDIR must fail when the stage dest is RO, not skip\n%s", out)
+	}
+	if strings.Contains(out, "(read-only)") && strings.Contains(out, "skip ") {
+		t.Fatalf("DESTDIR RO is not a live skip: %s", out)
 	}
 }
 
