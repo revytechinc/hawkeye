@@ -146,7 +146,7 @@ Rebase onto the branch, keep tests green, do not force-push `main`.
 | `internal/cli/cli.go` | Commands |
 | `internal/redact/redact.go` | Secret scrubbing |
 | `internal/apply/apply.go` | Dry-run default and exec gate |
-| `internal/knowledge/knowledge.go` | RO SQLite FTS |
+| `internal/knowledge/knowledge.go` | RO SQLite FTS + sqlite-vec rank |
 | `rc.d/hawkeye` | Optional updater + localhost MCP |
 | `man/hawkeye.8` | Program manual |
 | `man/hawkeye.conf.5` | Config keys |

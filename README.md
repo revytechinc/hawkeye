@@ -30,7 +30,7 @@ execs as root.
 |---------|----------------|
 | `hawkeye` | Panic path. On a TTY, print a host first-look (fstab, rc, zpool, disks, net — not `doctor`), then type the problem at `>`. Each line is a consult, then `Apply these steps? [y/N/e]`. `quit`/`exit`/`q`/Ctrl-D leave. Non-TTY with no args prints a reminder to run on a terminal. `--json` dumps inspect JSON and never enters the session. |
 | `hawkeye inspect` | Host first-look only (same findings as the session banner). Diagnose only. `--json` for the machine object. Not `doctor`. |
-| `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. TTY asks `[y/N/e]` to apply or edit; default N. `--json`, pipes, and MCP do not prompt. Mutation still needs `--yes` or a second y. |
+| `hawkeye consult` | Diagnose using knowledge FTS, optional sqlite-vec rank when embeddings exist and RAM allows, and optional LLM. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. TTY asks `[y/N/e]` to apply or edit; default N. `--json`, pipes, and MCP do not prompt. Mutation still needs `--yes` or a second y. Empty embeddings stay FTS-only (quiet). |
 | `hawkeye plan` | Propose steps from the lead consult playbook (stored commands). No mutation. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the JSON plan. Dry-run default; `--yes` to land via apply. |
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |
 | `hawkeye doctor` | Service health: config, perms, pidfile, deps, headroom. Human + JSON. Non-zero if unhealthy. |
@@ -96,10 +96,13 @@ and `hawkeye --check-config` both succeed after pkg/make install. A present
 file is still validated; invalid JSON fails. Secrets are environment variables
 (`HAWKEYE_LLM_API_KEY`). Local inference uses a configured llama.cpp-style
 binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`) and GGUF (`HAWKEYE_LLM_MODEL` /
-`llm.local.model_path`). No model is vendored; no cloud call. GPU if present
-then CPU. Knowledge is
+`llm.local.model_path`). Optional embeddings use `HAWKEYE_EMBED_MODEL` /
+`llm.local.embed_model_path` (local only; no cloud; no GGUF vendored).
+Empty embeddings stay FTS-only. When vectors exist and RAM allows,
+consult ranks with sqlite-vec. GPU if present then CPU. Knowledge is
 `knowledge.sqlite` from hawkeye-data (FTS5 tables `documents_fts` and
-`playbooks_fts`, with fallback to legacy `knowledge_fts`). Search order is
+`playbooks_fts`, with fallback to legacy `knowledge_fts`, plus optional
+`embeddings` FLOAT32 rows). Search order is
 `HAWKEYE_KNOWLEDGE_PATH` (exclusive when set), then `/boot/hawkeye`, then
 `/usr/local/share/hawkeye`, then XDG. See
 `hawkeye.conf(5)`.

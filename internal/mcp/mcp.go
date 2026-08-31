@@ -93,7 +93,7 @@ func (s *Server) Handle(req Request) Response {
 
 func toolList() []map[string]any {
 	return []map[string]any{
-		{"name": "consult", "description": "Diagnose using knowledge FTS and optional LLM. Never writes."},
+		{"name": "consult", "description": "Diagnose using knowledge FTS, optional sqlite-vec, optional LLM. Never writes."},
 		{"name": "plan", "description": "Produce a JSON plan. No mutation."},
 		{"name": "apply", "description": "Apply a plan. Defaults to dry-run. Privileged mutation is operator-only."},
 		{"name": "doctor", "description": "Service health: config, permissions, pidfile, dependencies, headroom."},

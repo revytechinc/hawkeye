@@ -932,3 +932,75 @@ absent ok. Exit 1.
 `mandoc` not installed here. Equivalent mdoc lint: required macros
 present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
 SIGNALS FILES SEE ALSO). RO `/boot` skip is documented. No hawkeye-www.
+
+## 23. sqlite-vec / vector search when RAM allows (2026-08-31)
+
+T026. CORE hole: `embeddings` table has 0 rows in the current jail kit.
+FTS must still work. When FLOAT32 rows exist and RAM allows, consult
+ranks with sqlite-vec (`modernc.org/sqlite/vec` v0.1.9). No cloud embed
+API. No GGUF vendored. Consult stays read-only. Runtime fill of existing
+chunks uses `OpenRW` + a local embedder only.
+
+Red (before PackF32 / Search vector merge / Local.Embed):
+
+```
+# github.com/revytechinc/hawkeye/internal/knowledge_test
+undefined: knowledge.UnpackF32
+undefined: knowledge.PackF32
+undefined: knowledge.DistanceCosine
+undefined: knowledge.InsertEmbedding
+st.Vec undefined
+st.QueryVec undefined
+# github.com/revytechinc/hawkeye/internal/llm_test
+l.Embed undefined
+unknown field EmbedModelPath
+# github.com/revytechinc/hawkeye/internal/config_test
+c.LLM.Local.EmbedModelPath undefined
+FAIL
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+PackF32            100.0%
+UnpackF32          100.0%
+DistanceCosine     100.0%
+useVectors         100.0%
+searchVectors      100.0%
+vectorHits         100.0%
+vectorHitsSQL      100.0%
+lookupTarget       100.0%
+mergeHits          100.0%
+probeVectors       100.0%
+vecAvailable       100.0%
+FakeEmbedder       100.0%
+Local.Embed        100.0%
+Local.Model        100.0%
+parseEmbedding     100.0%
+attachSearch       100.0%
+openKnowledge      100.0%
+knowledge package  90.7%
+llm package        98.0%
+redact             100.0%
+total              89.3%
+```
+
+Tiny FAKE vectors only (dim 3). Empty `embeddings` keeps FTS order
+(`boot environment` still leads with the BE playbook). Query vec
+`[0.99,0.01,0]` matching remount `[1,0,0]` promotes
+`Remount ZFS root read-write` and still attaches stored commands.
+Low RAM (`ram_min_free_bytes` above free) stays FTS-only, no error.
+No embedder + rows present stays FTS-only. Secrets are redacted before
+the embedder. TTY has no `vec_distance` / embeddings chrome.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json doctor` (no kit): UNHEALTHY, knowledge missing, GPU
+absent ok. Exit 1. Human + JSON.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present. `llm.local.embed_model_path` and `HAWKEYE_EMBED_MODEL` are in
+`hawkeye.conf(5)`. Consult sqlite-vec rank is in `hawkeye(8)`.
+No hawkeye-www. Tests do not remount ZFS `/`. No GGUF vendored.

@@ -25,11 +25,12 @@ type Knowledge struct {
 }
 
 type LocalLLM struct {
-	Backend    string `json:"backend"`
-	Bin        string `json:"bin"`
-	ModelPath  string `json:"model_path"`
-	PreferGPU  bool   `json:"prefer_gpu"`
-	RequireGPU bool   `json:"require_gpu"`
+	Backend        string `json:"backend"`
+	Bin            string `json:"bin"`
+	ModelPath      string `json:"model_path"`
+	EmbedModelPath string `json:"embed_model_path"`
+	PreferGPU      bool   `json:"prefer_gpu"`
+	RequireGPU     bool   `json:"require_gpu"`
 }
 
 type RemoteLLM struct {
@@ -218,9 +219,10 @@ func ResolvePath(explicit string) string {
 	return filepath.Join(SystemDir(), "config.json")
 }
 
-// ApplyEnv overlays operator environment. Model path and backend binary
-// may live in JSON or env (HAWKEYE_LLM_MODEL, HAWKEYE_LLM_BIN). Tokens,
-// if a remote key is ever set, stay in env only.
+// ApplyEnv overlays operator environment. Model path, embed model, and
+// backend binary may live in JSON or env (HAWKEYE_LLM_MODEL,
+// HAWKEYE_EMBED_MODEL, HAWKEYE_LLM_BIN). Tokens, if a remote key is ever
+// set, stay in env only.
 func ApplyEnv(c Config, getenv func(string) string) Config {
 	if getenv == nil {
 		return c
@@ -230,6 +232,9 @@ func ApplyEnv(c Config, getenv func(string) string) Config {
 	}
 	if v := strings.TrimSpace(getenv("HAWKEYE_LLM_BIN")); v != "" {
 		c.LLM.Local.Bin = v
+	}
+	if v := strings.TrimSpace(getenv("HAWKEYE_EMBED_MODEL")); v != "" {
+		c.LLM.Local.EmbedModelPath = v
 	}
 	if v := strings.TrimSpace(getenv("HAWKEYE_UPDATE_SOURCE")); v != "" {
 		c.Update.Source = v
