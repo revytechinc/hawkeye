@@ -97,7 +97,11 @@ XDG. Install ships `config.json.sample` (mode `0644`, no secrets). A live
 and `hawkeye --check-config` both succeed after pkg/make install. A present
 file is still validated; invalid JSON fails. Secrets are environment variables
 (`HAWKEYE_LLM_API_KEY`). Local inference uses a llama.cpp-style
-binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`, or `PATH`) and a GGUF
+binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`, or `PATH`:
+`llama-completion` then `llama-cli` then `llama.cpp`). `llama-cli`
+b9426 is conversation-only; Complete adds `--single-turn --simple-io`
+so the panic session does not hang on `>`. Trailing chat leftovers
+(`> EOF by user`, `Exiting...`) are stripped. A GGUF
 (`HAWKEYE_LLM_MODEL` / `llm.local.model_path`, or the first `*.gguf` under
 `/usr/local/share/hawkeye/models`, `/boot/hawkeye/models`, or
 `HAWKEYE_MODELS_DIR`). Missing GGUF is a quiet TTY skip; `doctor` notes it

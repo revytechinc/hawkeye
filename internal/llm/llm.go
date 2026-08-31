@@ -41,10 +41,11 @@ type Completer interface {
 	Complete(ctx context.Context, req Request) (Response, error)
 }
 
-// Local invokes a configured llama.cpp-style binary (llama-cli / llama.cpp)
-// with a local GGUF. GPU layers are enabled when a GPU is present and
-// preferred; otherwise the job stays on CPU. Missing GPU does not block
-// CPU jobs. Consumption-based headroom still uses Allow().
+// Local invokes a configured llama.cpp-style binary (llama-completion,
+// llama-cli, llama.cpp) with a local GGUF. llama-cli 9426 is
+// conversation-only; Complete passes --single-turn --simple-io so the
+// panic session does not hang on `>`. GPU layers when a GPU is present
+// and VRAM is known; otherwise CPU. Missing GPU does not block CPU jobs.
 type Local struct {
 	Backend        string
 	Bin            string
@@ -92,7 +93,7 @@ func (l Local) Complete(ctx context.Context, req Request) (Response, error) {
 		return Response{Backend: l.Backend, UsedGPU: useGPU}, err
 	}
 	return Response{
-		Text:    strings.TrimSpace(out),
+		Text:    cleanCompletion(out),
 		Backend: l.Backend,
 		UsedGPU: useGPU,
 	}, nil
@@ -113,7 +114,7 @@ func resolveBin(explicit string) string {
 	if strings.TrimSpace(explicit) != "" {
 		return explicit
 	}
-	for _, name := range []string{"llama-cli", "llama.cpp"} {
+	for _, name := range []string{"llama-completion", "llama-cli", "llama.cpp"} {
 		if p, err := lookPath(name); err == nil && p != "" {
 			return p
 		}
@@ -121,12 +122,17 @@ func resolveBin(explicit string) string {
 	return ""
 }
 
+func needsSingleTurn(bin string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(bin)))
+	return base == "llama-cli" || strings.HasPrefix(base, "llama-cli.")
+}
+
 func cliArgs(bin, model, prompt string, useGPU bool) []string {
 	ngl := "0"
 	if useGPU {
 		ngl = "99"
 	}
-	return []string{
+	argv := []string{
 		bin,
 		"-m", model,
 		"-p", prompt,
@@ -134,6 +140,42 @@ func cliArgs(bin, model, prompt string, useGPU bool) []string {
 		"-n", "256",
 		"-ngl", ngl,
 	}
+	if needsSingleTurn(bin) {
+		argv = append(argv, "--single-turn", "--simple-io")
+	}
+	return argv
+}
+
+// cleanCompletion drops trailing llama-cli chat leftovers so TTY
+// consult does not show "> EOF by user" / "Exiting...".
+func cleanCompletion(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	lines := strings.Split(s, "\n")
+	for len(lines) > 0 {
+		last := strings.TrimSpace(lines[len(lines)-1])
+		if last == "" || leftoverLine(last) {
+			lines = lines[:len(lines)-1]
+			continue
+		}
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func leftoverLine(s string) bool {
+	s = strings.TrimSpace(s)
+	switch s {
+	case ">", "> EOF by user", "EOF by user", "Exiting...", "Exiting.":
+		return true
+	}
+	lower := strings.ToLower(s)
+	if strings.HasPrefix(lower, "> eof") {
+		return true
+	}
+	if strings.HasPrefix(lower, "exiting") {
+		return true
+	}
+	return false
 }
 
 func (l Local) invoke(ctx context.Context, argv []string) (string, error) {

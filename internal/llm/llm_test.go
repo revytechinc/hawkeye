@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/revytechinc/hawkeye/internal/headroom"
 	"github.com/revytechinc/hawkeye/internal/llm"
@@ -34,7 +35,155 @@ func writeFakeLlama(t *testing.T, capture, canned string) string {
 	return bin
 }
 
+func writeFakeLlamaNamed(t *testing.T, name, capture, canned string) string {
+	t.Helper()
+	dir := t.TempDir()
+	bin := filepath.Join(dir, name)
+	script := "#!/bin/sh\n"
+	if capture != "" {
+		script += "for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + capture + "\"; done\n"
+	}
+	script += "printf '%s\\n' '" + canned + "'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+// writeChatOnlyLlamaCLI hangs like llama-cli 9426 conversation mode unless
+// --single-turn is present. A hang is a test failure (panic session must not wait).
+func writeChatOnlyLlamaCLI(t *testing.T, canned string) string {
+	t.Helper()
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "llama-cli")
+	script := "#!/bin/sh\nsingle=0\nfor a in \"$@\"; do\n  if [ \"$a\" = \"--single-turn\" ]; then single=1; fi\ndone\nif [ \"$single\" -eq 0 ]; then exec cat >/dev/null; fi\nprintf '%s\\n' '" + canned + "'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
 func vram(n int64) *int64 { return &n }
+
+func TestLocal_LlamaCLIGetsSingleTurn(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlamaNamed(t, "llama-cli", capture, "one-shot")
+	l := llm.Local{Backend: "llama.cpp", Bin: bin, ModelPath: model, Headroom: ampleRAM()}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "root is read-only"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "one-shot" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	argv := string(got)
+	if !strings.Contains(argv, "--single-turn") {
+		t.Fatalf("llama-cli 9426 is conversation-only; must pass --single-turn: %s", argv)
+	}
+	if !strings.Contains(argv, "--simple-io") {
+		t.Fatalf("llama-cli one-shot must pass --simple-io: %s", argv)
+	}
+}
+
+func TestLocal_LlamaCompletionIsOneShotWithoutSingleTurn(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlamaNamed(t, "llama-completion", capture, "from-completion")
+	l := llm.Local{Backend: "llama.cpp", Bin: bin, ModelPath: model, Headroom: ampleRAM()}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "root is read-only"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "from-completion" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	argv := string(got)
+	if strings.Contains(argv, "--single-turn") || strings.Contains(argv, "--simple-io") {
+		t.Fatalf("llama-completion already one-shots; do not add chat flags: %s", argv)
+	}
+}
+
+func TestLocal_LookPathPrefersLlamaCompletion(t *testing.T) {
+	dir := t.TempDir()
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli := filepath.Join(dir, "llama-cli")
+	comp := filepath.Join(dir, "llama-completion")
+	if err := os.WriteFile(cli, []byte("#!/bin/sh\nprintf 'from-cli\\n'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(comp, []byte("#!/bin/sh\nprintf 'from-completion\\n'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	l := llm.Local{Backend: "llama.cpp", ModelPath: model, Headroom: ampleRAM()}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != "from-completion" {
+		t.Fatalf("PATH must prefer llama-completion over llama-cli: %q", resp.Text)
+	}
+}
+
+func TestLocal_LlamaCLIWithoutSingleTurnIsHangFailure(t *testing.T) {
+	model := filepath.Join(t.TempDir(), "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeChatOnlyLlamaCLI(t, "one-shot complete")
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	l := llm.Local{Backend: "llama.cpp", Bin: bin, ModelPath: model, Headroom: ampleRAM()}
+	resp, err := l.Complete(ctx, llm.Request{Prompt: "root is read-only"})
+	if err != nil {
+		t.Fatalf("conversation-mode hang is a product failure; --single-turn must one-shot: %v", err)
+	}
+	if resp.Text != "one-shot complete" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+}
+
+func TestLocal_StripsLlamaChatLeftovers(t *testing.T) {
+	l := llm.Local{
+		Backend:   "llama.cpp",
+		Bin:       "/usr/local/bin/llama-cli",
+		ModelPath: "/models/fake.gguf",
+		Headroom:  ampleRAM(),
+		Run: func(_ context.Context, argv []string) (string, error) {
+			return "remount the ZFS root read-write\n> EOF by user\nExiting...\n", nil
+		},
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "root is read-only"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(resp.Text, "EOF by user") || strings.Contains(resp.Text, "Exiting") || strings.Contains(resp.Text, ">") {
+		t.Fatalf("TTY must not show llama chat leftovers: %q", resp.Text)
+	}
+	if resp.Text != "remount the ZFS root read-write" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+}
 
 func TestLocal_JailLikeGPUNullVRAMUsesCPUNotSkip(t *testing.T) {
 	// Product jail: gpu_present (nvidia0) but gpu_vram_free_bytes=null.

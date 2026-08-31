@@ -85,18 +85,27 @@ Default
 .It Va llm.local.bin
 Path to a local llama.cpp-style binary
 .Pq
+.Nm llama-completion ,
 .Nm llama-cli ,
-.Nm llama.cpp ,
 or
-.Nm llama-server
+.Nm llama.cpp
 invoked as a one-shot completer
 .Ns .
 Empty means search
 .Ev PATH
 for
+.Nm llama-completion
+then
 .Nm llama-cli
 then
 .Nm llama.cpp .
+.Nm llama-cli
+b9426 is conversation-only; Hawkeye adds
+.Fl -single-turn
+and
+.Fl -simple-io
+so Complete does not hang the panic session on
+.Ql > .
 Override with
 .Ev HAWKEYE_LLM_BIN .
 .It Va llm.local.model_path

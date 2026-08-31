@@ -179,6 +179,13 @@ the query
 then related titles.
 When a local GGUF is configured or discovered under the well-known
 model dirs, the completion is printed after the playbook hits.
+.Nm llama-cli
+is invoked one-shot
+.Pq Fl -single-turn Fl -simple-io
+so the session does not hang in chat.
+Trailing leftovers such as
+.Ql > EOF by user
+are stripped.
 It does not print query or tier keys, ranks, or an
 .Dq llm skipped
 line

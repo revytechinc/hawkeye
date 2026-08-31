@@ -39,3 +39,4 @@
 | T030 | hawkeye embed fills kit embeddings | DONE | cursor/operator-gguf-embed-rescue-fbcf | dry-run default; --yes writes; refuse RO; FakeEmbedder tests |
 | T031 | install-rescue dangling /rescue → /rescue/hawkeye | DONE | cursor/operator-gguf-embed-rescue-fbcf | replace dangling symlink; install into real /rescue; EROFS skip |
 | T032 | Null VRAM / GPU fail falls back to -ngl 0 | DONE | cursor/operator-gguf-embed-rescue-fbcf | jail nvidia0 + null VRAM; do not skip consult |
+| T033 | llama-cli one-shot; prefer llama-completion | DONE | cursor/operator-gguf-embed-rescue-fbcf | --single-turn --simple-io; strip EOF leftovers; no hang |

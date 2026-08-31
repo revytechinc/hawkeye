@@ -1239,3 +1239,34 @@ rescue image.
 `--check-config` defaults: exit 0.
 `TestResolveMode_DefaultIsDryRun` unchanged.
 No GGUF vendored. No remount. No hawkeye-www.
+
+## 28. llama-cli one-shot; prefer llama-completion (2026-08-31)
+
+T033. Jail proof (hawkeye-0.1.0_9 SHA 52960eed, llama-cpp-9426_1):
+Complete fires with a dropped GGUF. `llama-cli` 9426 is conversation-only
+and hangs on `>` without `--single-turn`. Jail workaround:
+`llm.local.bin=/usr/local/bin/llama-completion`. Models at
+`/usr/local/share/hawkeye/models/*.gguf`.
+
+Red:
+
+```
+--- FAIL: TestLocal_LlamaCLIGetsSingleTurn
+    llama-cli 9426 is conversation-only; must pass --single-turn
+--- FAIL: TestLocal_LookPathPrefersLlamaCompletion
+    PATH must prefer llama-completion over llama-cli: "from-cli"
+--- FAIL: TestLocal_LlamaCLIWithoutSingleTurnIsHangFailure
+    conversation-mode hang is a product failure
+--- FAIL: TestLocal_StripsLlamaChatLeftovers
+    TTY must not show llama chat leftovers: "...> EOF by user\nExiting..."
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1` PASS.
+Hang fixture (`cat` without `--single-turn`) is a test failure; with
+`--single-turn` Complete returns immediately. `llama-completion` argv
+has no `--single-turn`. Leftovers stripped. PATH prefers
+`llama-completion`.
+
+`--check-config` defaults: exit 0.
+`TestResolveMode_DefaultIsDryRun` unchanged.
+No GGUF vendored. No hang of the panic session. No hawkeye-www.
