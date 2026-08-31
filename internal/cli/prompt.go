@@ -72,7 +72,10 @@ func planCommands(p apply.Plan) []string {
 }
 
 func promptConsultApply(env Env, fs flagset, cfg config.Config, plan apply.Plan) int {
-	in := bufio.NewReader(env.Stdin)
+	return promptConsultApplyReader(env, fs, cfg, plan, bufio.NewReader(env.Stdin))
+}
+
+func promptConsultApplyReader(env Env, fs flagset, cfg config.Config, plan apply.Plan, in *bufio.Reader) int {
 	for {
 		fmt.Fprint(env.Stdout, promptApplySteps)
 		line, err := readPromptLine(in)

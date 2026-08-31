@@ -6,6 +6,8 @@
 .Nd FreeBSD diagnostic and operations doctor (MASH)
 .Sh SYNOPSIS
 .Nm
+.Op Ar query ...
+.Nm
 .Op Fl -config Ar path
 .Op Fl -check-config
 .Op Fl -json
@@ -22,6 +24,37 @@ It is
 .Em not
 a public chat UI.
 .Pp
+With no command, on a terminal,
+.Nm
+is the panic path: a short
+.Ql hawkeye
+banner and a
+.Ql >
+prompt.
+Type the problem
+.Pq one line .
+Each line is a consult, then
+.Dq Apply these steps? [y/N/e]
+as for
+.Nm consult .
+Empty lines re-prompt.
+.Cm quit ,
+.Cm exit ,
+.Cm q ,
+and EOF leave with status 0.
+.Cm help
+and
+.Ql ?
+print a short reminder.
+Positional words that are not a known command are the first query;
+on a TTY the session continues.
+Without a terminal and with no arguments, print a short reminder to run
+.Nm
+on a terminal
+.Pq do not wait on a pipe .
+.Fl -json
+never enters the session.
+.Pp
 Knowledge is consumed, never vendored in this repository.
 .Sh INSTALLATION
 Install the binary and knowledge kit together:
@@ -37,6 +70,9 @@ A second
 install of the data port is not required.
 .Sh COMMANDS
 .Bl -tag -width indent
+.It Nm
+With no command, start the panic-path operator session on a terminal.
+This is the intended invocation when the host is on fire.
 .It Nm consult Op Ar query
 Diagnose using FTS knowledge and an optional LLM.
 Default stdout is an operator session: the most actionable playbook for
@@ -182,6 +218,7 @@ Prefer JSON output for
 and
 .Nm doctor .
 Consult does not prompt.
+Never starts the panic-path operator session.
 .It Fl -dry-run
 Force apply dry-run
 .Pq default .
