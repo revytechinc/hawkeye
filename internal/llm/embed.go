@@ -23,14 +23,14 @@ func (l Local) Embed(ctx context.Context, text string) ([]float32, error) {
 	}
 	text = redact.String(text)
 	needGPU := l.RequireGPU
-	if needGPU && !l.GPUPresent {
+	if needGPU && !l.gpuUsable() {
 		return nil, ErrGPURequired
 	}
 	job := headroom.Job{NeedRAM: true, NeedGPU: needGPU}
 	if err := headroom.Allow(job, l.Headroom, l.RAMMin, nil, nil, l.VRAMMin); err != nil {
 		return nil, err
 	}
-	useGPU := l.PreferGPU && l.GPUPresent
+	useGPU := l.PreferGPU && l.gpuUsable()
 	if strings.TrimSpace(l.EmbedModelPath) == "" {
 		return nil, ErrNoModel
 	}
@@ -40,6 +40,10 @@ func (l Local) Embed(ctx context.Context, text string) ([]float32, error) {
 	}
 	argv := embedArgs(bin, l.EmbedModelPath, text, useGPU)
 	out, err := l.invoke(ctx, argv)
+	if err != nil && useGPU && !needGPU && ctx.Err() == nil {
+		argv = embedArgs(bin, l.EmbedModelPath, text, false)
+		out, err = l.invoke(ctx, argv)
+	}
 	if err != nil {
 		return nil, err
 	}

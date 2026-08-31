@@ -22,7 +22,7 @@ flowchart TD
     CLI --> LLM["llm: llama-cli/llama.cpp local GGUF; GPU then CPU"]
     Knowledge -->|"consumes artifacts"| DataRepo["hawkeye-data artifacts"]
     PlanApply -->|"default dry-run; audit"| System["FreeBSD system"]
-    LLM -->|"redact first"| LocalBin["configured llama-cli; no cloud"]
+    LLM -->|"redact first; GPU then CPU; null VRAM is CPU"| LocalBin["configured llama-cli; no cloud"]
     LLM -->|"optional"| Remote["Grok / FreeGrok / Claude via env key"]
 ```
 

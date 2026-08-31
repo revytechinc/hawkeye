@@ -105,7 +105,9 @@ and stays healthy. Optional embeddings use `HAWKEYE_EMBED_MODEL` /
 `llm.local.embed_model_path` (local only; no cloud; no GGUF vendored).
 `hawkeye embed --yes` fills a writable kit; consult never writes.
 Empty embeddings stay FTS-only. When vectors exist and RAM allows,
-consult ranks with sqlite-vec. GPU if present then CPU. Knowledge is
+consult ranks with sqlite-vec. GPU if present and VRAM is known, then CPU;
+null VRAM (thin jail `/dev/nvidia0`) stays `-ngl 0` and does not skip
+consult. Knowledge is
 `knowledge.sqlite` from hawkeye-data (FTS5 tables `documents_fts` and
 `playbooks_fts`, with fallback to legacy `knowledge_fts`, plus optional
 `embeddings` FLOAT32 rows). Search order is

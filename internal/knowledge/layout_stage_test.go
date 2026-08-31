@@ -73,6 +73,36 @@ func TestCanStageRescue_MissingSkipped(t *testing.T) {
 	}
 }
 
+func TestCanStageBootKit_SymlinkToRealBootAllowed(t *testing.T) {
+	dir := t.TempDir()
+	realBoot := filepath.Join(dir, ".bastille", "boot")
+	if err := os.MkdirAll(realBoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Symlink(realBoot, boot); err != nil {
+		t.Fatal(err)
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	if knowledge.CanStageBootKit("", kit, os.Lstat) != true {
+		t.Fatal("live /boot symlink to a real boot image must allow creating /boot/hawkeye")
+	}
+	if !knowledge.CanStageBootKit("", kit, nil) {
+		t.Fatal("nil lstat uses os.Lstat")
+	}
+}
+
+func TestCanStageBootKit_DanglingBootSkipped(t *testing.T) {
+	dir := t.TempDir()
+	boot := filepath.Join(dir, "boot")
+	if err := os.Symlink(filepath.Join(dir, "missing-boot"), boot); err != nil {
+		t.Fatal(err)
+	}
+	if knowledge.CanStageBootKit("", filepath.Join(boot, "hawkeye"), os.Lstat) {
+		t.Fatal("dangling /boot must not invent a boot filesystem")
+	}
+}
+
 func TestCanStageBootKit_BootExistsNoHawkeye(t *testing.T) {
 	dir := t.TempDir()
 	boot := filepath.Join(dir, "boot")
@@ -706,5 +736,47 @@ func TestMakefileInstallRescue_DESTDIRCreatesBoth(t *testing.T) {
 	}
 	if fi, err := os.Stat(filepath.Join(stage, "boot", "hawkeye")); err != nil || !fi.IsDir() {
 		t.Fatalf("DESTDIR must create /boot/hawkeye: %v\n%s", err, out)
+	}
+}
+
+func TestMakefileInstallRescue_BootSymlinkCreatesKit(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	ensureDummyHawkeye(t)
+	dir := t.TempDir()
+	realBoot := filepath.Join(dir, ".bastille", "boot")
+	if err := os.MkdirAll(realBoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Symlink(realBoot, boot); err != nil {
+		t.Fatal(err)
+	}
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Symlink(filepath.Join(dir, ".bastille", "rescue"), rescue); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(rescue); !os.IsNotExist(err) {
+		t.Fatal("fixture must be a dangling /rescue (ENOENT through the link)")
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+kit,
+		"DESTDIR=",
+	)
+	if err != nil {
+		t.Fatalf("jail-like dangling /rescue + /boot symlink: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(rescue, "hawkeye")); err != nil {
+		t.Fatalf("dangling /rescue must become a real dir with hawkeye: %v\n%s", err, out)
+	}
+	if st, err := os.Lstat(boot); err != nil || st.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("must keep the live /boot symlink: %v %v", err, st)
+	}
+	if fi, err := os.Stat(filepath.Join(realBoot, "hawkeye")); err != nil || !fi.IsDir() {
+		t.Fatalf("must create /boot/hawkeye through the live boot symlink: %v\n%s", err, out)
 	}
 }

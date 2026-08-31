@@ -66,14 +66,14 @@ func (l Local) Complete(ctx context.Context, req Request) (Response, error) {
 	}
 	req.Prompt = redact.String(req.Prompt)
 	needGPU := req.NeedGPU || l.RequireGPU
-	if needGPU && !l.GPUPresent {
+	if needGPU && !l.gpuUsable() {
 		return Response{}, ErrGPURequired
 	}
 	job := headroom.Job{NeedRAM: true, NeedGPU: needGPU}
 	if err := headroom.Allow(job, l.Headroom, l.RAMMin, nil, nil, l.VRAMMin); err != nil {
 		return Response{}, err
 	}
-	useGPU := l.PreferGPU && l.GPUPresent
+	useGPU := l.PreferGPU && l.gpuUsable()
 	if strings.TrimSpace(l.ModelPath) == "" {
 		return Response{Backend: l.Backend, UsedGPU: useGPU}, ErrNoModel
 	}
@@ -83,6 +83,11 @@ func (l Local) Complete(ctx context.Context, req Request) (Response, error) {
 	}
 	argv := cliArgs(bin, l.ModelPath, req.Prompt, useGPU)
 	out, err := l.invoke(ctx, argv)
+	if err != nil && useGPU && !needGPU && ctx.Err() == nil {
+		argv = cliArgs(bin, l.ModelPath, req.Prompt, false)
+		out, err = l.invoke(ctx, argv)
+		useGPU = false
+	}
 	if err != nil {
 		return Response{Backend: l.Backend, UsedGPU: useGPU}, err
 	}
@@ -91,6 +96,17 @@ func (l Local) Complete(ctx context.Context, req Request) (Response, error) {
 		Backend: l.Backend,
 		UsedGPU: useGPU,
 	}, nil
+}
+
+// gpuUsable is true only when a device is present and VRAM is known.
+// Product jails often have /dev/nvidia0 (gpu_present) with
+// gpu_vram_free_bytes=null — llama-cli -ngl 99 fails there. CPU (-ngl 0)
+// must still run. Missing GPU does not block CPU jobs.
+func (l Local) gpuUsable() bool {
+	if !l.GPUPresent {
+		return false
+	}
+	return l.Headroom.GPUVRAMFreeBytes != nil
 }
 
 func resolveBin(explicit string) string {

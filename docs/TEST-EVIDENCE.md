@@ -1193,3 +1193,49 @@ SIGNALS FILES SEE ALSO; embed command; install-rescue dangling replace).
 `hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO;
 `HAWKEYE_MODELS_DIR` and well-known `models/` discover. No hawkeye-www.
 No GGUF vendored. Tests do not remount ZFS `/`.
+
+## 27. Jail GPU null VRAM is CPU; /boot symlink stages kit (2026-08-31)
+
+T032. Product jail hawkeye.revytechinc.com (FreeBSD 16-CURRENT,
+hawkeye-0.1.0_9): `doctor` reports `gpu=true` and
+`gpu_vram_free_bytes=null`. Live config `prefer_gpu=true`. Treating
+`gpu_present` as `-ngl 99` makes llama-cli fail and consult skips.
+`/rescue` → `/.bastille/rescue` is dangling (touch ENOENT).
+`/boot` → `/.bastille/boot` is a live writable symlink.
+Well-known model dir: `/usr/local/share/hawkeye/models/*.gguf`.
+
+Red:
+
+```
+--- FAIL: TestLocal_JailLikeGPUNullVRAMUsesCPUNotSkip
+    null VRAM is not usable GPU
+--- FAIL: TestLocal_GPUInvokeFailFallsBackToCPU
+    GPU fail must fall back to CPU, not skip: cuda error: no usable VRAM
+--- FAIL: TestConsult_NullVRAMStillCompletesOnCPU
+    CPU complete missing after null-VRAM GPU present
+--- FAIL: TestCanStageBootKit_SymlinkToRealBootAllowed
+    live /boot symlink to a real boot image must allow creating /boot/hawkeye
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1` PASS.
+
+```
+gpuUsable              100.0%
+resolvedDir            100.0%
+CanStageBootKit        100.0%
+Complete                95.8%
+llm package            96.1%
+redact                100.0%
+total                  89.4%
+```
+
+Null VRAM + prefer_gpu + nvidia0 uses `-ngl 0` and returns completion.
+GPU invoke failure retries `-ngl 0` (unless require_gpu). Consult TTY
+still prints playbook + local-complete. `make install-rescue` on a
+dangling `/rescue` plus `/boot` symlink creates `/rescue/hawkeye` and
+`/boot/hawkeye` through the live boot link without replacing a real
+rescue image.
+
+`--check-config` defaults: exit 0.
+`TestResolveMode_DefaultIsDryRun` unchanged.
+No GGUF vendored. No remount. No hawkeye-www.

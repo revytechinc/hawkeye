@@ -460,7 +460,14 @@ Linux
 .Pa /sys/class/net
 is not the FreeBSD probe.
 May escalate large jobs to a remote LLM.
-GPU is used if it works and is not required otherwise.
+GPU is used if it works and free VRAM is known.
+A present GPU with null VRAM
+.Pq thin jail
+.Pa /dev/nvidia0
+falls back to CPU
+.Pq Fl ngl 0
+and does not skip consult.
+GPU is not required otherwise.
 .El
 .Sh FILES
 .Bl -tag -width indent

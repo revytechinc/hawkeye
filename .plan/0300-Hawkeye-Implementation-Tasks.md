@@ -38,3 +38,4 @@
 | T029 | Auto-discover local GGUF when model_path empty | DONE | cursor/operator-gguf-embed-rescue-fbcf | well-known models dir; quiet TTY skip if missing; doctor note not fail |
 | T030 | hawkeye embed fills kit embeddings | DONE | cursor/operator-gguf-embed-rescue-fbcf | dry-run default; --yes writes; refuse RO; FakeEmbedder tests |
 | T031 | install-rescue dangling /rescue → /rescue/hawkeye | DONE | cursor/operator-gguf-embed-rescue-fbcf | replace dangling symlink; install into real /rescue; EROFS skip |
+| T032 | Null VRAM / GPU fail falls back to -ngl 0 | DONE | cursor/operator-gguf-embed-rescue-fbcf | jail nvidia0 + null VRAM; do not skip consult |

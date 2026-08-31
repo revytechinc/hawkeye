@@ -34,6 +34,102 @@ func writeFakeLlama(t *testing.T, capture, canned string) string {
 	return bin
 }
 
+func vram(n int64) *int64 { return &n }
+
+func TestLocal_JailLikeGPUNullVRAMUsesCPUNotSkip(t *testing.T) {
+	// Product jail: gpu_present (nvidia0) but gpu_vram_free_bytes=null.
+	// prefer_gpu=true must not pass -ngl 99 (llama-cli fails; consult skips).
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlama(t, capture, "cpu complete: remount the ZFS root")
+	ram := int64(256 * 1024 * 1024)
+	l := llm.Local{
+		Backend:    "llama.cpp",
+		Bin:        bin,
+		ModelPath:  model,
+		PreferGPU:  true,
+		RequireGPU: false,
+		GPUPresent: true,
+		Headroom: headroom.Snapshot{
+			RAMFreeBytes:     129 << 30,
+			RAMTotalBytes:    129 << 30,
+			GPUPresent:       true,
+			GPUVRAMFreeBytes: nil,
+		},
+		RAMMin:  &ram,
+		VRAMMin: nil,
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "root is read-only", NeedGPU: false, NeedRAM: true})
+	if err != nil {
+		t.Fatalf("null VRAM must fall back to CPU, not skip: %v", err)
+	}
+	if resp.UsedGPU {
+		t.Fatal("null VRAM is not usable GPU")
+	}
+	if resp.Text != "cpu complete: remount the ZFS root" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), "99") {
+		t.Fatalf("null VRAM must not pass -ngl 99: %s", got)
+	}
+	if !strings.Contains(string(got), "\n0\n") {
+		t.Fatalf("null VRAM must pass -ngl 0: %s", got)
+	}
+}
+
+func TestLocal_GPUInvokeFailFallsBackToCPU(t *testing.T) {
+	model := filepath.Join(t.TempDir(), "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var ngl []string
+	l := llm.Local{
+		Backend:    "llama.cpp",
+		Bin:        "/usr/local/bin/llama-cli",
+		ModelPath:  model,
+		PreferGPU:  true,
+		RequireGPU: false,
+		GPUPresent: true,
+		Headroom: headroom.Snapshot{
+			RAMFreeBytes:     1 << 30,
+			GPUPresent:       true,
+			GPUVRAMFreeBytes: vram(1 << 30),
+		},
+		Run: func(_ context.Context, argv []string) (string, error) {
+			for i, a := range argv {
+				if a == "-ngl" && i+1 < len(argv) {
+					ngl = append(ngl, argv[i+1])
+				}
+			}
+			if len(ngl) > 0 && ngl[len(ngl)-1] == "99" {
+				return "", errors.New("cuda error: no usable VRAM")
+			}
+			return "cpu fallback complete", nil
+		},
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "root is read-only", NeedGPU: false, NeedRAM: true})
+	if err != nil {
+		t.Fatalf("GPU fail must fall back to CPU, not skip: %v", err)
+	}
+	if resp.UsedGPU {
+		t.Fatal("fallback must not mark UsedGPU")
+	}
+	if resp.Text != "cpu fallback complete" {
+		t.Fatalf("text=%q", resp.Text)
+	}
+	if len(ngl) < 2 || ngl[0] != "99" || ngl[1] != "0" {
+		t.Fatalf("must try -ngl 99 then 0: %v", ngl)
+	}
+}
+
 func TestLocal_JailLikeGPUNullVRAMNoModelSkips(t *testing.T) {
 	// Live product jail: /dev/nvidia0 present, gpu_vram_free_bytes null,
 	// llama.cpp backend, empty model_path, prefer_gpu, no llama-cli, no GGUF.
@@ -217,7 +313,7 @@ func TestLocal_PreferGPUPassesLayersWhenPresent(t *testing.T) {
 		ModelPath:  model,
 		PreferGPU:  true,
 		GPUPresent: true,
-		Headroom:   headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true},
+		Headroom:   headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true, GPUVRAMFreeBytes: vram(1 << 30)},
 	}
 	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello"})
 	if err != nil {

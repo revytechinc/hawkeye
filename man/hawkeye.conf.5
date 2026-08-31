@@ -133,6 +133,12 @@ FLOAT32 blobs with sqlite-vec.
 Missing GPU uses CPU.
 .It Va llm.local.prefer_gpu
 Try GPU then CPU.
+A present GPU with null VRAM is treated as unusable and stays on CPU
+.Pq Fl ngl 0
+.Ns .
+A GPU invoke failure also retries CPU unless
+.Va require_gpu
+is true.
 .It Va llm.local.require_gpu
 If true, GPU jobs fail when no GPU is present.
 Default false.

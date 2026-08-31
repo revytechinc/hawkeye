@@ -83,6 +83,35 @@ func TestLocal_EmbedFakeBinaryGPUThenCPU(t *testing.T) {
 	}
 }
 
+func TestLocal_EmbedNullVRAMUsesCPU(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake-embed.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlama(t, capture, "[1.0, 0.0]")
+	l := llm.Local{
+		Backend:        "llama.cpp",
+		Bin:            bin,
+		EmbedModelPath: model,
+		PreferGPU:      true,
+		GPUPresent:     true,
+		Headroom:       headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true, GPUVRAMFreeBytes: nil},
+	}
+	vec, err := l.Embed(context.Background(), "zfs")
+	if err != nil || len(vec) != 2 {
+		t.Fatalf("null VRAM must embed on CPU: %v %v", vec, err)
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), "99") {
+		t.Fatalf("null VRAM must not pass -ngl 99: %s", got)
+	}
+}
+
 func TestLocal_EmbedPreferGPU(t *testing.T) {
 	dir := t.TempDir()
 	capture := filepath.Join(dir, "argv.txt")
@@ -97,7 +126,7 @@ func TestLocal_EmbedPreferGPU(t *testing.T) {
 		EmbedModelPath: model,
 		PreferGPU:      true,
 		GPUPresent:     true,
-		Headroom:       headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true},
+		Headroom:       headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true, GPUVRAMFreeBytes: vram(1 << 30)},
 	}
 	vec, err := l.Embed(context.Background(), "zfs")
 	if err != nil {
@@ -141,7 +170,7 @@ func TestLocal_EmbedRequireGPUWhenPresent(t *testing.T) {
 		RequireGPU:     true,
 		PreferGPU:      true,
 		GPUPresent:     true,
-		Headroom:       headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true},
+		Headroom:       headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true, GPUVRAMFreeBytes: vram(1 << 30)},
 	}
 	vec, err := l.Embed(context.Background(), "zfs")
 	if err != nil || len(vec) != 1 {
