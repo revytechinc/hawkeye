@@ -3,6 +3,7 @@ It consults local knowledge (FTS SQLite from hawkeye-data), optionally a
 local llama.cpp model or a remote LLM, and applies operator-confirmed
 plans. Apply defaults to dry-run. It is not a public chat UI.
 
-This port is binaries only. Knowledge artifacts come from hawkeye-data.
+This port ships the binary. The hawkeye-data knowledge kit is a runtime
+dependency, so pkg install hawkeye installs both.
 
 WWW: https://github.com/revytechinc/hawkeye

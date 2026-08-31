@@ -54,6 +54,15 @@ carrier, and `/rescue`. If the root is read-only, the **first skill is
 Consult needs no write. Knowledge opens SQLite `mode=ro` and `immutable=1` when
 the root is RO.
 
+## Install
+
+```sh
+pkg install hawkeye
+```
+
+That package depends on hawkeye-data, so the knowledge kit is installed
+with the binary. You do not need `pkg install hawkeye hawkeye-data`.
+
 ## Build
 
 ```sh

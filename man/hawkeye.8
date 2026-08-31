@@ -23,6 +23,18 @@ It is
 a public chat UI.
 .Pp
 Knowledge is consumed, never vendored in this repository.
+.Sh INSTALLATION
+Install the binary and knowledge kit together:
+.Pp
+.Dl pkg install hawkeye
+.Pp
+.Nm
+depends on
+.Nm hawkeye-data
+and pulls the corpus in.
+A second
+.Nm pkg
+install of the data port is not required.
 .Sh COMMANDS
 .Bl -tag -width indent
 .It Nm consult Op Ar query
