@@ -31,3 +31,4 @@
 | T022 | Host first-look before session `>` | DONE | cursor/host-first-look-session-b2ff | panic path inspects HOST (fstab/rc/zpool/net/disk); not doctor; compose with T021 |
 | T023 | inspect expands rc.subr `${name}` in command= | IN PROGRESS | cursor/inspect-rc-name-expand-c049 | live jail false-positive sshd missing; isolate plan tests from live kit |
 | T024 | Rescue layout install | DONE | cursor/core-llm-update-rescue-d1e7 | make install-rescue; port RESCUE; /rescue + /boot/hawkeye |
+| T025 | install-rescue skip RO /boot | DONE | cursor/skip-ro-boot-install-rescue-79b6 | EROFS/EACCES/EPERM skip like /rescue; DESTDIR still creates both |

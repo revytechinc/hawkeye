@@ -42,9 +42,11 @@ install: build
 
 # DESTDIR/STAGEDIR always stages prefixes (package/chroot). Live install
 # writes /rescue only when it is a real directory — not a dangling bastille
-# symlink. /boot/hawkeye is created when /boot exists; missing /boot is skip.
-# Knowledge artifacts come from hawkeye-data (dual prefix); set KNOWLEDGE_SRC
-# to copy a sqlite file. Do not remount ZFS.
+# symlink. /boot/hawkeye is created when /boot exists and is writable.
+# Missing /boot is skip. A present /boot that is read-only (bastille
+# symlink to a release boot, EROFS/EACCES/EPERM) is skip — same style as
+# skip /rescue. Do not remount. Knowledge artifacts come from hawkeye-data
+# (dual prefix); set KNOWLEDGE_SRC to copy a sqlite file.
 install-rescue: build
 	@if [ -n "$(DESTDIR)" ] || { [ -d "$(RESCUE_DIR)" ] && [ ! -L "$(RESCUE_DIR)" ]; }; then \
 		install -d $(DESTDIR)$(RESCUE_DIR); \
@@ -52,10 +54,32 @@ install-rescue: build
 	else \
 		echo "install-rescue: skip $(RESCUE_DIR) (not a real directory)"; \
 	fi
-	@if [ -n "$(DESTDIR)" ] || [ -d "$(BOOT_HAWKEYE)" ] || [ -d "`dirname $(BOOT_HAWKEYE)`" ]; then \
+	@if [ -n "$(DESTDIR)" ]; then \
 		install -d $(DESTDIR)$(BOOT_HAWKEYE); \
 		if [ -n "$(KNOWLEDGE_SRC)" ] && [ -f "$(KNOWLEDGE_SRC)" ]; then \
 			install -m 0644 "$(KNOWLEDGE_SRC)" $(DESTDIR)$(BOOT_HAWKEYE)/knowledge.sqlite; \
+		fi; \
+	elif [ -d "$(BOOT_HAWKEYE)" ]; then \
+		if [ -n "$(KNOWLEDGE_SRC)" ] && [ -f "$(KNOWLEDGE_SRC)" ]; then \
+			install -m 0644 "$(KNOWLEDGE_SRC)" $(BOOT_HAWKEYE)/knowledge.sqlite; \
+		fi; \
+	elif [ -d "`dirname $(BOOT_HAWKEYE)`" ]; then \
+		_boot_err=$$(mkdir -m 0755 $(BOOT_HAWKEYE) 2>&1); \
+		_boot_rc=$$?; \
+		if [ $$_boot_rc -eq 0 ]; then \
+			if [ -n "$(KNOWLEDGE_SRC)" ] && [ -f "$(KNOWLEDGE_SRC)" ]; then \
+				install -m 0644 "$(KNOWLEDGE_SRC)" $(BOOT_HAWKEYE)/knowledge.sqlite; \
+			fi; \
+		else \
+			case "$$_boot_err" in \
+			*Read-only*|*read-only*|*Permission\ denied*|*Operation\ not\ permitted*|*EROFS*|*EACCES*|*EPERM*) \
+				echo "install-rescue: skip $(BOOT_HAWKEYE) (read-only)"; \
+				;; \
+			*) \
+				echo "$$_boot_err" >&2; \
+				exit $$_boot_rc; \
+				;; \
+			esac; \
 		fi; \
 	else \
 		echo "install-rescue: skip $(BOOT_HAWKEYE) (no /boot)"; \

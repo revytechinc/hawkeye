@@ -126,7 +126,16 @@ is skipped.
 .Pa /boot/hawkeye
 is created when
 .Pa /boot
-exists.
+exists and is writable.
+A read-only
+.Pa /boot
+.Pq bastille symlink to a release boot; EROFS, EACCES, or EPERM
+is skipped the same way as a dangling
+.Pa /rescue
+.Ns .
+The install does not remount
+.Pa /boot
+.Ns .
 The port option
 .Cm RESCUE
 is off by default and stages the same paths under
