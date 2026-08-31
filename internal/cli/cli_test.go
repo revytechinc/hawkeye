@@ -85,6 +85,74 @@ func TestInitAndCheckConfig(t *testing.T) {
 	}
 }
 
+func TestCheckConfig_MissingUsesDefaults(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.json")
+	code, out, err := run(t, []string{"--config", p, "--check-config"}, "", fakeHost{usr: true, varp: true}, nil)
+	if code != 0 {
+		t.Fatalf("missing config must be valid defaults: %d %s %s", code, out, err)
+	}
+	if strings.Contains(err, "no such file") {
+		t.Fatalf("must not require a live config.json: %s", err)
+	}
+	if !strings.Contains(strings.ToLower(out), "ok") {
+		t.Fatalf("want configuration ok: %s", out)
+	}
+}
+
+func TestCheckConfig_SampleOnlyDir(t *testing.T) {
+	dir := t.TempDir()
+	b, initErr := config.InitJSON()
+	if initErr != nil {
+		t.Fatal(initErr)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json.sample"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "config.json")
+	code, out, stderr := run(t, []string{"--config", p, "--check-config"}, "", fakeHost{usr: true, varp: true}, nil)
+	if code != 0 {
+		t.Fatalf("sample-only dir: %d %s %s", code, out, stderr)
+	}
+	if strings.Contains(stderr, "no such file") {
+		t.Fatalf("must not require copying the sample: %s", stderr)
+	}
+	if !strings.Contains(strings.ToLower(out), "ok") {
+		t.Fatalf("want configuration ok: %s", out)
+	}
+}
+
+func TestCheckConfig_AgreesWithDoctorOnMissing(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.json")
+	ccode, cout, cerr := run(t, []string{"--config", p, "--check-config"}, "", fakeHost{usr: true, varp: true}, nil)
+	if ccode != 0 {
+		t.Fatalf("check-config: %d %s %s", ccode, cout, cerr)
+	}
+	_, dout, derr := run(t, []string{"--config", p, "--json", "doctor"}, "", fakeHost{usr: true, varp: true}, nil)
+	_ = derr
+	var rep struct {
+		Checks []struct {
+			Name string `json:"name"`
+			OK   bool   `json:"ok"`
+		} `json:"checks"`
+	}
+	if err := json.Unmarshal([]byte(dout), &rep); err != nil {
+		t.Fatalf("doctor json: %v %s", err, dout)
+	}
+	found := false
+	for _, c := range rep.Checks {
+		if c.Name != "config" {
+			continue
+		}
+		found = true
+		if !c.OK {
+			t.Fatal("doctor config check must be ok when the file is missing")
+		}
+	}
+	if !found {
+		t.Fatalf("doctor missing config check: %s", dout)
+	}
+}
+
 func TestCheckConfig_FailsOnGarbage(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "c.json")
 	if err := os.WriteFile(p, []byte("nope"), 0o600); err != nil {

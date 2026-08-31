@@ -380,3 +380,70 @@ both remain.
 follow-up capture). Apply `ResolveMode` remains 100%. Tests use FAKE
 secret fixtures only.
 
+## 14. `--check-config` missing file uses defaults (2026-08-31)
+
+T016: native pkg/make install ships `config.json.sample` only. `doctor` already
+treated a missing live `config.json` as compiled defaults; `--check-config`
+failed with `open …/config.json: no such file or directory`.
+
+Red (`CheckFile` still required a live file):
+
+```
+--- FAIL: TestCheckFile_MissingUsesDefaults
+    config_test.go:57: missing config must use compiled defaults (same as doctor): open …/config.json: no such file or directory
+--- FAIL: TestCheckFile_SampleOnlyDirUsesDefaults
+    config_test.go:79: sample-only dir must use defaults; operators must not be required to copy the sample: open …/config.json: no such file or directory
+--- FAIL: TestResolvePath_SampleOnlyDoesNotSelectSample
+    resolve_test.go:57: sample-only system dir must check as defaults: open …/config.json: no such file or directory
+--- FAIL: TestCheckConfig_MissingUsesDefaults
+    cli_test.go:92: missing config must be valid defaults: 1  hawkeye: --check-config failed: open …/config.json: no such file or directory
+--- FAIL: TestCheckConfig_SampleOnlyDir
+--- FAIL: TestCheckConfig_AgreesWithDoctorOnMissing
+```
+
+Green: `go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply     coverage: 98.8%
+ok  github.com/revytechinc/hawkeye/internal/cli       coverage: 77.3%
+ok  github.com/revytechinc/hawkeye/internal/config    coverage: 85.3%
+ok  github.com/revytechinc/hawkeye/internal/doctor    coverage: 95.9%
+ok  github.com/revytechinc/hawkeye/internal/redact    coverage: 100.0%
+total: (statements) 87.0%
+```
+
+`config.CheckFile` 85.7%. `config.Validate` 96.3%. `apply.ResolveMode` still 100%
+(dry-run default not weakened).
+
+Binary evidence (`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye`):
+
+```
+$ hawkeye --config configs/config.example.json --check-config
+configuration ok: configs/config.example.json
+# exit 0
+
+$ hawkeye --config /tmp/nope-hawkeye.json --check-config
+configuration ok: defaults (no file at /tmp/nope-hawkeye.json)
+# exit 0
+
+$ # sample-only dir: config.json.sample present, config.json absent
+$ hawkeye --config "$sodir/config.json" --check-config
+configuration ok: defaults (no file at …/config.json)
+# exit 0
+
+$ hawkeye --config /tmp/hawkeye-bad.json --check-config
+hawkeye: --check-config failed: not valid JSON (RFC 8259)
+# exit 1
+```
+
+`hawkeye --json doctor` (no kit on this host): config check `ok: true`
+(`configuration is valid`); dependencies FAIL (knowledge store missing);
+GPU absent is ok. Exit 1.
+
+`hawkeye apply` without `--yes`: `"dry_run": true`, `"applied": false`.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros present
+(Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS SIGNALS FILES KEYS
+ENVIRONMENT SEE ALSO). `config.json.sample` documented in `hawkeye(8)` FILES
+and `hawkeye.conf(5)`.
+

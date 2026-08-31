@@ -165,8 +165,15 @@ Default search:
 .Pa $XDG_CONFIG_HOME/hawkeye/config.json
 if present, else
 .Pa /usr/local/etc/cloudbsd/hawkeye/config.json .
+The live file is optional; a missing file uses compiled defaults.
 .It Fl -check-config
 Validate the configuration and exit.
+A missing file is valid and uses compiled defaults
+.Pq the same as
+.Nm doctor
+.Ns .
+A present file is parsed as RFC 8259 JSON and validated.
+Invalid JSON fails.
 Must succeed before a SIGHUP reload.
 .It Fl -json
 Prefer JSON output for
@@ -227,7 +234,13 @@ GPU is used if it works and is not required otherwise.
 .Sh FILES
 .Bl -tag -width indent
 .It Pa /usr/local/etc/cloudbsd/hawkeye/config.json
-System configuration.
+System configuration
+.Pq optional; missing uses compiled defaults .
+.It Pa /usr/local/etc/cloudbsd/hawkeye/config.json.sample
+Installed sample
+.Pq mode 0644; no secrets .
+Not loaded unless copied to
+.Pa config.json .
 .It Pa /usr/local/etc/rc.d/hawkeye
 rc.d script.
 .It Pa /var/run/hawkeye.pid

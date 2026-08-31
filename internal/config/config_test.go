@@ -48,6 +48,38 @@ func TestCheckFile_ValidSample(t *testing.T) {
 	}
 }
 
+func TestCheckFile_MissingUsesDefaults(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.json")
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatal("expected missing live config")
+	}
+	if err := config.CheckFile(p); err != nil {
+		t.Fatalf("missing config must use compiled defaults (same as doctor): %v", err)
+	}
+}
+
+func TestCheckFile_SampleOnlyDirUsesDefaults(t *testing.T) {
+	dir := t.TempDir()
+	b, err := config.InitJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sample := filepath.Join(dir, "config.json.sample")
+	if err := os.WriteFile(sample, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.ToLower(string(b)), "sk-") || strings.Contains(string(b), "BEGIN ") {
+		t.Fatal("sample fixture must not contain secrets")
+	}
+	live := filepath.Join(dir, "config.json")
+	if _, err := os.Stat(live); !os.IsNotExist(err) {
+		t.Fatal("live config.json must be absent in a sample-only dir")
+	}
+	if err := config.CheckFile(live); err != nil {
+		t.Fatalf("sample-only dir must use defaults; operators must not be required to copy the sample: %v", err)
+	}
+}
+
 func TestCheckFile_RejectsInvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "bad.json")

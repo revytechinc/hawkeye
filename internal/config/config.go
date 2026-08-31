@@ -154,6 +154,11 @@ func Parse(b []byte) (Config, error) {
 func CheckFile(path string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Native install ships config.json.sample only. Missing live
+			// config is valid: compiled defaults, same as doctor.Load.
+			return Validate(Default())
+		}
 		return err
 	}
 	_, err = Parse(b)
