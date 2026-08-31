@@ -22,6 +22,25 @@ Per-user path
 System path:
 .Pa /usr/local/etc/cloudbsd/hawkeye/config.json
 .Pp
+The live
+.Pa config.json
+is optional.
+If it is absent,
+.Nm hawkeye
+and
+.Nm hawkeye Fl -check-config
+use compiled defaults
+.Pq the same as
+.Nm hawkeye Cm doctor
+.Ns .
+Install ships
+.Pa config.json.sample
+.Pq mode 0644; no secrets
+and does not require the operator to copy it before
+.Fl -check-config
+succeeds.
+A present file is still validated; invalid JSON fails.
+.Pp
 Generate a sample with
 .Nm hawkeye Cm init .
 Validate with

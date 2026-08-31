@@ -82,6 +82,10 @@ func RunEnv(env Env) int {
 			fmt.Fprintf(env.Stderr, "hawkeye: --check-config failed: %v\n", err)
 			return 1
 		}
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			fmt.Fprintln(env.Stdout, "configuration ok: defaults (no file at "+path+")")
+			return 0
+		}
 		fmt.Fprintln(env.Stdout, "configuration ok:", path)
 		return 0
 	}
