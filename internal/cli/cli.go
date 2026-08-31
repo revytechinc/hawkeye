@@ -43,6 +43,9 @@ type Env struct {
 	Editor func(path string) error
 	// Exec overrides apply.SysExecutor (tests). Mutation still requires --yes / second y.
 	Exec apply.Executor
+	// Embedder overrides the local embedder (tests use FakeEmbedder).
+	// Production uses llm.Local when embed_model_path is set or discovered.
+	Embedder knowledge.Embedder
 }
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -106,6 +109,7 @@ func RunEnv(env Env) int {
 		}
 	}
 	cfg = config.ApplyEnv(cfg, env.Getenv)
+	cfg = resolveLocalModels(cfg, env)
 
 	switch fs.cmd {
 	case "":
@@ -132,6 +136,8 @@ func RunEnv(env Env) int {
 		return cmdMCP(env, fs, cfg)
 	case "update":
 		return cmdUpdate(env, fs, cfg)
+	case "embed":
+		return cmdEmbed(env, fs, cfg)
 	default:
 		fmt.Fprintf(env.Stderr, "hawkeye: unknown command %q\n", fs.cmd)
 		return 2
@@ -242,6 +248,9 @@ Commands:
   mcp [--stdio|--http]
                       MCP server (stdio default; HTTP is Streamable HTTP on 127.0.0.1, bearer token required)
   update              Refresh knowledge from hawkeye-data artifacts when writable
+  embed [--dry-run|--yes] [--dest PATH]
+                      Fill embeddings on a writable kit copy. DEFAULT is dry-run.
+                      Consult stays read-only. --yes writes. Refuses a read-only store.
   init                Write a sample JSON config
   version             Print version
 

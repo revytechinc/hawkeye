@@ -14,17 +14,41 @@ import (
 	"github.com/revytechinc/hawkeye/internal/knowledge"
 )
 
-func TestCanStageRescue_DanglingSymlinkSkipped(t *testing.T) {
+func TestCanStageRescue_DanglingSymlinkAllowed(t *testing.T) {
 	dir := t.TempDir()
 	rescue := filepath.Join(dir, "rescue")
 	if err := os.Symlink(filepath.Join(dir, "missing-target"), rescue); err != nil {
 		t.Fatal(err)
 	}
-	if knowledge.CanStageRescue("", rescue, os.Lstat) {
-		t.Fatal("dangling bastille /rescue must be skipped")
+	if !knowledge.CanStageRescue("", rescue, os.Lstat) {
+		t.Fatal("dangling bastille /rescue must be replaceable with a real /rescue")
+	}
+	if !knowledge.CanStageRescue("", rescue, nil) {
+		t.Fatal("nil lstat uses os.Lstat")
 	}
 	if !knowledge.CanStageRescue("/var/tmp/stage", rescue, os.Lstat) {
 		t.Fatal("DESTDIR/STAGEDIR must still stage /rescue")
+	}
+	if !strings.Contains(knowledge.RescueSkipReadOnly(rescue), "skip "+rescue+" (read-only)") {
+		t.Fatal(knowledge.RescueSkipReadOnly(rescue))
+	}
+}
+
+func TestCanStageRescue_SymlinkToRealDirAllowed(t *testing.T) {
+	dir := t.TempDir()
+	realRescue := filepath.Join(dir, "real-rescue")
+	if err := os.Mkdir(realRescue, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(realRescue, "ls"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Symlink(realRescue, rescue); err != nil {
+		t.Fatal(err)
+	}
+	if !knowledge.CanStageRescue("", rescue, os.Lstat) {
+		t.Fatal("symlink to a real rescue image must be installable (into, not replace)")
 	}
 }
 
@@ -46,6 +70,36 @@ func TestCanStageRescue_MissingSkipped(t *testing.T) {
 	}
 	if knowledge.CanStageRescue("", "", os.Lstat) {
 		t.Fatal("empty rescue dir")
+	}
+}
+
+func TestCanStageBootKit_SymlinkToRealBootAllowed(t *testing.T) {
+	dir := t.TempDir()
+	realBoot := filepath.Join(dir, ".bastille", "boot")
+	if err := os.MkdirAll(realBoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Symlink(realBoot, boot); err != nil {
+		t.Fatal(err)
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	if knowledge.CanStageBootKit("", kit, os.Lstat) != true {
+		t.Fatal("live /boot symlink to a real boot image must allow creating /boot/hawkeye")
+	}
+	if !knowledge.CanStageBootKit("", kit, nil) {
+		t.Fatal("nil lstat uses os.Lstat")
+	}
+}
+
+func TestCanStageBootKit_DanglingBootSkipped(t *testing.T) {
+	dir := t.TempDir()
+	boot := filepath.Join(dir, "boot")
+	if err := os.Symlink(filepath.Join(dir, "missing-boot"), boot); err != nil {
+		t.Fatal(err)
+	}
+	if knowledge.CanStageBootKit("", filepath.Join(boot, "hawkeye"), os.Lstat) {
+		t.Fatal("dangling /boot must not invent a boot filesystem")
 	}
 }
 
@@ -312,6 +366,21 @@ func liveBootMkdirShell(mk, bootHawkeye string) (string, error) {
 	return strings.Join(body, "\n"), nil
 }
 
+func ensureDummyHawkeye(t *testing.T) {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dummy := filepath.Join(root, "hawkeye")
+	if _, err := os.Stat(dummy); err != nil {
+		if err := os.WriteFile(dummy, []byte("x"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(dummy) })
+	}
+}
+
 func makeInstallRescue(t *testing.T, extra ...string) (string, error) {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
@@ -337,6 +406,7 @@ func TestMakefileInstallRescue_FakeRODestExit0(t *testing.T) {
 	if _, err := exec.LookPath("make"); err != nil {
 		t.Skip("make not installed")
 	}
+	ensureDummyHawkeye(t)
 	dir := t.TempDir()
 	boot := filepath.Join(dir, "boot")
 	if err := os.Mkdir(boot, 0o755); err != nil {
@@ -361,8 +431,11 @@ func TestMakefileInstallRescue_FakeRODestExit0(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install-rescue must exit 0 on RO /boot: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "skip "+rescue+" (not a real directory)") {
-		t.Fatalf("must skip dangling /rescue: %s", out)
+	if _, err := os.Stat(filepath.Join(rescue, "hawkeye")); err != nil {
+		t.Fatalf("dangling /rescue must become /rescue/hawkeye: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "skip "+rescue+" (not a real directory)") {
+		t.Fatalf("dangling /rescue is no longer a skip: %s", out)
 	}
 	if !strings.Contains(out, "skip "+kit+" (read-only)") {
 		t.Fatalf("must skip RO /boot/hawkeye: %s", out)
@@ -474,6 +547,166 @@ func TestMakefileInstallRescue_DESTDIRRODestFails(t *testing.T) {
 	}
 }
 
+func TestMakefileInstallRescue_DanglingSymlinkWritesBinary(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	ensureDummyHawkeye(t)
+	dir := t.TempDir()
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Symlink(filepath.Join(dir, "missing"), rescue); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Mkdir(boot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+kit,
+		"DESTDIR=",
+	)
+	if err != nil {
+		t.Fatalf("dangling /rescue must install: %v\n%s", err, out)
+	}
+	bin := filepath.Join(rescue, "hawkeye")
+	fi, err := os.Stat(bin)
+	if err != nil {
+		t.Fatalf("need /rescue/hawkeye after replacing dangling symlink: %v\n%s", err, out)
+	}
+	if fi.Mode()&0o111 == 0 {
+		t.Fatalf("/rescue/hawkeye must be executable: %s", fi.Mode())
+	}
+	if st, err := os.Lstat(rescue); err != nil || st.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("dangling symlink must become a real directory: %v %v", err, st)
+	}
+}
+
+func TestMakefileInstallRescue_IntactRescueKeepsTools(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	ensureDummyHawkeye(t)
+	dir := t.TempDir()
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Mkdir(rescue, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ls := filepath.Join(rescue, "ls")
+	if err := os.WriteFile(ls, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Mkdir(boot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+kit,
+		"DESTDIR=",
+	)
+	if err != nil {
+		t.Fatalf("intact /rescue must install into: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(ls); err != nil {
+		t.Fatalf("must not empty a working /rescue: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(rescue, "hawkeye")); err != nil {
+		t.Fatalf("must install hawkeye beside existing tools: %v\n%s", err, out)
+	}
+	ents, err := os.ReadDir(rescue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ents) < 2 {
+		t.Fatalf("working /rescue must keep its tools: %v", ents)
+	}
+}
+
+func TestMakefileInstallRescue_SymlinkToRealRescueInstallsInto(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	ensureDummyHawkeye(t)
+	dir := t.TempDir()
+	realRescue := filepath.Join(dir, "real-rescue")
+	if err := os.Mkdir(realRescue, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ls := filepath.Join(realRescue, "ls")
+	if err := os.WriteFile(ls, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Symlink(realRescue, rescue); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Mkdir(boot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+filepath.Join(boot, "hawkeye"),
+		"DESTDIR=",
+	)
+	if err != nil {
+		t.Fatalf("symlink-to-real /rescue must install into: %v\n%s", err, out)
+	}
+	if st, err := os.Lstat(rescue); err != nil || st.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("must keep the symlink to the real rescue image: %v %v", err, st)
+	}
+	if _, err := os.Stat(ls); err != nil {
+		t.Fatalf("must not replace or empty the real rescue image: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(realRescue, "hawkeye")); err != nil {
+		t.Fatalf("must install hawkeye into the real image: %v\n%s", err, out)
+	}
+}
+
+func TestMakefileInstallRescue_RORescueSkipped(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("chmod 0555 is still writable as root")
+	}
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	ensureDummyHawkeye(t)
+	dir := t.TempDir()
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Mkdir(rescue, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(rescue, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(rescue, 0o755) })
+	boot := filepath.Join(dir, "boot")
+	if err := os.Mkdir(boot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+filepath.Join(boot, "hawkeye"),
+		"DESTDIR=",
+	)
+	if err != nil {
+		t.Fatalf("EROFS/EACCES /rescue must skip exit 0: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "skip "+rescue+" (read-only)") {
+		t.Fatalf("must skip RO /rescue with the existing skip message: %s", out)
+	}
+	if _, err := os.Stat(filepath.Join(rescue, "hawkeye")); !os.IsNotExist(err) {
+		t.Fatal("must not write hawkeye onto RO /rescue")
+	}
+}
+
 func TestMakefileInstallRescue_DESTDIRCreatesBoth(t *testing.T) {
 	if _, err := exec.LookPath("make"); err != nil {
 		t.Skip("make not installed")
@@ -503,5 +736,47 @@ func TestMakefileInstallRescue_DESTDIRCreatesBoth(t *testing.T) {
 	}
 	if fi, err := os.Stat(filepath.Join(stage, "boot", "hawkeye")); err != nil || !fi.IsDir() {
 		t.Fatalf("DESTDIR must create /boot/hawkeye: %v\n%s", err, out)
+	}
+}
+
+func TestMakefileInstallRescue_BootSymlinkCreatesKit(t *testing.T) {
+	if _, err := exec.LookPath("make"); err != nil {
+		t.Skip("make not installed")
+	}
+	ensureDummyHawkeye(t)
+	dir := t.TempDir()
+	realBoot := filepath.Join(dir, ".bastille", "boot")
+	if err := os.MkdirAll(realBoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	boot := filepath.Join(dir, "boot")
+	if err := os.Symlink(realBoot, boot); err != nil {
+		t.Fatal(err)
+	}
+	rescue := filepath.Join(dir, "rescue")
+	if err := os.Symlink(filepath.Join(dir, ".bastille", "rescue"), rescue); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(rescue); !os.IsNotExist(err) {
+		t.Fatal("fixture must be a dangling /rescue (ENOENT through the link)")
+	}
+	kit := filepath.Join(boot, "hawkeye")
+	out, err := makeInstallRescue(t,
+		"BIN=hawkeye",
+		"RESCUE_DIR="+rescue,
+		"BOOT_HAWKEYE="+kit,
+		"DESTDIR=",
+	)
+	if err != nil {
+		t.Fatalf("jail-like dangling /rescue + /boot symlink: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(rescue, "hawkeye")); err != nil {
+		t.Fatalf("dangling /rescue must become a real dir with hawkeye: %v\n%s", err, out)
+	}
+	if st, err := os.Lstat(boot); err != nil || st.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("must keep the live /boot symlink: %v %v", err, st)
+	}
+	if fi, err := os.Stat(filepath.Join(realBoot, "hawkeye")); err != nil || !fi.IsDir() {
+		t.Fatalf("must create /boot/hawkeye through the live boot symlink: %v\n%s", err, out)
 	}
 }

@@ -22,7 +22,7 @@ const (
 
 func isKnownCommand(s string) bool {
 	switch s {
-	case "help", "version", "init", "consult", "plan", "apply", "doctor", "inspect", "mcp", "update":
+	case "help", "version", "init", "consult", "plan", "apply", "doctor", "inspect", "mcp", "update", "embed":
 		return true
 	}
 	return false

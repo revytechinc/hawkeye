@@ -31,7 +31,7 @@ USE_RC_SUBR=	hawkeye
 # STAGEDIR (DESTDIR-safe). Local inference is optional; do not depend on
 # an uninstalled llama.cpp port.
 OPTIONS_DEFINE=	RESCUE
-RESCUE_DESC=	Stage /rescue/hawkeye when /rescue is a real directory
+RESCUE_DESC=	Stage /rescue/hawkeye (into a real /rescue; live dangling symlink is replaced)
 
 PLIST_FILES=	bin/hawkeye \
 		etc/cloudbsd/hawkeye/config.json.sample \

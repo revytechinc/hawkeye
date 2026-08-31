@@ -5,6 +5,8 @@ package doctor_test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -41,6 +43,60 @@ func TestRun_UnhealthyWhenPidfileEmpty(t *testing.T) {
 	})
 	if r.Healthy {
 		t.Fatal("empty pidfile must be unhealthy")
+	}
+}
+
+func TestRun_MissingOptionalGGUFIsNoteNotFail(t *testing.T) {
+	cfg := config.Default()
+	cfg.LLM.Local.ModelPath = ""
+	r := doctor.Run(doctor.Deps{
+		Cfg:         cfg,
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 1},
+	})
+	if !r.Healthy {
+		t.Fatalf("missing optional GGUF must not fail doctor: %+v", r)
+	}
+	found := false
+	for _, c := range r.Checks {
+		if c.Name != "local_llm" {
+			continue
+		}
+		found = true
+		if !c.OK {
+			t.Fatalf("local_llm must stay ok: %+v", c)
+		}
+		if !strings.Contains(strings.ToLower(c.Detail), "optional") {
+			t.Fatalf("want optional-GGUF note: %q", c.Detail)
+		}
+	}
+	if !found {
+		t.Fatal("doctor must note optional local GGUF")
+	}
+}
+
+func TestRun_PresentOptionalGGUFIsStillHealthy(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "tiny.gguf")
+	if err := os.WriteFile(p, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.LLM.Local.ModelPath = p
+	r := doctor.Run(doctor.Deps{
+		Cfg:         cfg,
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 1},
+	})
+	if !r.Healthy {
+		t.Fatalf("present optional GGUF must stay healthy: %+v", r)
+	}
+	for _, c := range r.Checks {
+		if c.Name == "local_llm" && !strings.Contains(c.Detail, "present") {
+			t.Fatalf("want present: %q", c.Detail)
+		}
 	}
 }
 
@@ -86,7 +142,7 @@ func TestRun_ReportsAllResourcesEvenUnused(t *testing.T) {
 	for _, c := range r.Checks {
 		names[c.Name] = true
 	}
-	for _, want := range []string{"config", "permissions", "pidfile", "dependencies", "headroom"} {
+	for _, want := range []string{"config", "permissions", "pidfile", "dependencies", "headroom", "local_llm"} {
 		if !names[want] {
 			t.Fatalf("missing check %s in %#v", want, names)
 		}
@@ -165,4 +221,3 @@ func TestRun_UnreadablePidfileNotEmpty(t *testing.T) {
 	}
 	t.Fatal("missing pidfile check")
 }
-

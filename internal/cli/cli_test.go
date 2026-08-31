@@ -273,7 +273,7 @@ func TestUpdate_RefusesRO(t *testing.T) {
 
 func TestHelpAndUnknown(t *testing.T) {
 	code, out, _ := run(t, []string{"--help"}, "", fakeHost{}, nil)
-	if code != 0 || !strings.Contains(out, "consult") {
+	if code != 0 || !strings.Contains(out, "consult") || !strings.Contains(out, "embed") {
 		t.Fatal(out)
 	}
 	// Words that are not a known subcommand are a consult query (panic path).

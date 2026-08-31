@@ -85,23 +85,43 @@ Default
 .It Va llm.local.bin
 Path to a local llama.cpp-style binary
 .Pq
+.Nm llama-completion ,
 .Nm llama-cli ,
-.Nm llama.cpp ,
 or
-.Nm llama-server
+.Nm llama.cpp
 invoked as a one-shot completer
 .Ns .
 Empty means search
 .Ev PATH
 for
+.Nm llama-completion
+then
 .Nm llama-cli
 then
 .Nm llama.cpp .
+.Nm llama-cli
+b9426 is conversation-only; Hawkeye adds
+.Fl -single-turn
+and
+.Fl -simple-io
+so Complete does not hang the panic session on
+.Ql > .
 Override with
 .Ev HAWKEYE_LLM_BIN .
 .It Va llm.local.model_path
-Path to a local GGUF model.
-Empty means LLM is optional
+Path to a local GGUF model, or a directory of
+.Pa *.gguf
+files.
+Empty means discover a GGUF under the well-known model dirs
+.Pq
+.Pa /boot/hawkeye/models ,
+.Pa /usr/local/share/hawkeye/models ,
+then those prefixes, then XDG
+.Ns
+or
+.Ev HAWKEYE_MODELS_DIR
+.Ns .
+If none is present, the LLM is optional
 .Pq quiet TTY skip; no model is vendored
 .Ns .
 Override with
@@ -122,6 +142,12 @@ FLOAT32 blobs with sqlite-vec.
 Missing GPU uses CPU.
 .It Va llm.local.prefer_gpu
 Try GPU then CPU.
+A present GPU with null VRAM is treated as unusable and stays on CPU
+.Pq Fl ngl 0
+.Ns .
+A GPU invoke failure also retries CPU unless
+.Va require_gpu
+is true.
 .It Va llm.local.require_gpu
 If true, GPU jobs fail when no GPU is present.
 Default false.
@@ -197,6 +223,13 @@ Override config path.
 Local GGUF path.
 Overrides
 .Va llm.local.model_path .
+.It Ev HAWKEYE_MODELS_DIR
+Extra directory scanned for
+.Pa *.gguf
+when
+.Va llm.local.model_path
+is empty.
+Searched before the well-known prefixes.
 .It Ev HAWKEYE_LLM_BIN
 Local llama.cpp-style binary.
 Overrides

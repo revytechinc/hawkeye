@@ -31,10 +31,28 @@ func realDir(path string, lstat LstatFunc) bool {
 	return fi.IsDir()
 }
 
+// resolvedDir is true for a real directory or a symlink that resolves to
+// one (thin jail /boot -> /.bastille/boot). Dangling symlinks are false.
+func resolvedDir(path string, lstat LstatFunc) bool {
+	if realDir(path, lstat) {
+		return true
+	}
+	if lstat == nil {
+		lstat = os.Lstat
+	}
+	fi, err := lstat(path)
+	if err != nil || fi == nil || fi.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+	st, err := os.Stat(path)
+	return err == nil && st != nil && st.IsDir()
+}
+
 // CanStageRescue is whether a hawkeye binary may be written at rescueDir.
 // destDir is DESTDIR/STAGEDIR: when set, staging is always allowed (package
-// build / chroot). A live path is allowed only when it is a real directory.
-// A dangling bastille /rescue symlink is not a directory and is skipped.
+// build / chroot). Live: a real directory, a symlink to a real rescue
+// image (install into; do not replace), or a dangling bastille symlink
+// (replace with a real directory). Missing /rescue stays skip.
 func CanStageRescue(destDir, rescueDir string, lstat LstatFunc) bool {
 	if strings.TrimSpace(destDir) != "" {
 		return true
@@ -42,14 +60,31 @@ func CanStageRescue(destDir, rescueDir string, lstat LstatFunc) bool {
 	if strings.TrimSpace(rescueDir) == "" {
 		return false
 	}
-	return realDir(rescueDir, lstat)
+	if realDir(rescueDir, lstat) {
+		return true
+	}
+	if lstat == nil {
+		lstat = os.Lstat
+	}
+	fi, err := lstat(rescueDir)
+	if err != nil || fi == nil {
+		return false
+	}
+	return fi.Mode()&os.ModeSymlink != 0
+}
+
+// RescueSkipReadOnly is the live-install note when /rescue cannot be
+// written because the filesystem is read-only (EROFS/EACCES/EPERM).
+func RescueSkipReadOnly(rescueDir string) string {
+	return "install-rescue: skip " + rescueDir + " (read-only)"
 }
 
 // CanStageBootKit is whether /boot/hawkeye (or destDir+that prefix) may be
 // created. DESTDIR is always allowed. Live: /boot/hawkeye already a real
-// directory, or its parent /boot is a real directory. Missing /boot is skip
-// (do not invent a boot filesystem). A present /boot that is read-only is
-// decided at create time by StageBootKit (EROFS/EACCES/EPERM → skip).
+// directory, or its parent /boot is a real directory or a symlink to one
+// (bastille /boot -> /.bastille/boot). Missing /boot is skip (do not invent
+// a boot filesystem). A present /boot that is read-only is decided at
+// create time by StageBootKit (EROFS/EACCES/EPERM → skip).
 func CanStageBootKit(destDir, bootHawkeye string, lstat LstatFunc) bool {
 	if strings.TrimSpace(destDir) != "" {
 		return true
@@ -57,10 +92,10 @@ func CanStageBootKit(destDir, bootHawkeye string, lstat LstatFunc) bool {
 	if strings.TrimSpace(bootHawkeye) == "" {
 		return false
 	}
-	if realDir(bootHawkeye, lstat) {
+	if resolvedDir(bootHawkeye, lstat) {
 		return true
 	}
-	return realDir(filepath.Dir(bootHawkeye), lstat)
+	return resolvedDir(filepath.Dir(bootHawkeye), lstat)
 }
 
 // IsReadOnlyCreateError is true for EROFS, EACCES, and EPERM (and PathError

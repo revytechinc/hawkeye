@@ -34,9 +34,14 @@ func TestMakefileInstallRescue(t *testing.T) {
 		t.Fatal(err)
 	}
 	mk := string(b)
-	for _, want := range []string{"install-rescue", "DESTDIR", "/rescue", "/boot/hawkeye", "! -L", "EROFS", "EACCES", "EPERM", "read-only"} {
+	for _, want := range []string{"install-rescue", "DESTDIR", "/rescue", "/boot/hawkeye", "-L", "rm -f", "EROFS", "EACCES", "EPERM", "read-only"} {
 		if !strings.Contains(mk, want) {
-			t.Fatalf("Makefile must DESTDIR-stage, skip dangling /rescue, and skip RO /boot (%s missing)", want)
+			t.Fatalf("Makefile must DESTDIR-stage, replace dangling /rescue, install into a real /rescue, and skip RO /boot (%s missing)", want)
+		}
+	}
+	if !strings.Contains(mk, `[ -d "$(RESCUE_DIR)" ]`) && !strings.Contains(mk, `[ -d "$(RESCUE_DIR)"]`) {
+		if !strings.Contains(mk, `-d "$(RESCUE_DIR)"`) {
+			t.Fatal("live /rescue that is a real directory (or symlink to one) must be detected with -d so tools stay intact")
 		}
 	}
 	if !strings.Contains(mk, "skip $(BOOT_HAWKEYE) (read-only)") {

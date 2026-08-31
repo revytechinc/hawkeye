@@ -124,6 +124,14 @@ func Run(d Deps) Report {
 	}
 	r.Checks = append(r.Checks, Check{Name: "headroom", OK: headOK, Detail: headDetail})
 
+	modelDetail := "optional local GGUF missing (consult skips quietly)"
+	if p := strings.TrimSpace(d.Cfg.LLM.Local.ModelPath); p != "" {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			modelDetail = "optional local GGUF present"
+		}
+	}
+	r.Checks = append(r.Checks, Check{Name: "local_llm", OK: true, Detail: modelDetail})
+
 	r.Healthy = true
 	for _, c := range r.Checks {
 		if !c.OK {
