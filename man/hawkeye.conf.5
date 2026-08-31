@@ -142,6 +142,16 @@ Source
 .Pa knowledge.sqlite
 for
 .Nm hawkeye Cm update .
+.It Ev VISUAL , Ev EDITOR
+Editor for
+.Nm hawkeye Cm consult
+.Cm e
+on a TTY.
+.Ev VISUAL
+is tried first, then
+.Ev EDITOR ,
+then
+.Ic vi .
 .It Ev XDG_CONFIG_HOME , Ev XDG_DATA_HOME
 Per-user config and data.
 .El

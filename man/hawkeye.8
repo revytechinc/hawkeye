@@ -39,7 +39,6 @@ install of the data port is not required.
 .Bl -tag -width indent
 .It Nm consult Op Ar query
 Diagnose using FTS knowledge and an optional LLM.
-Performs no writes.
 Default stdout is an operator session: the most actionable playbook for
 the query
 .Pq title, stored summary, stored commands ,
@@ -53,6 +52,56 @@ or
 set to
 .Li 1
 emits the machine object instead.
+On a TTY
+.Pq stdin is a terminal
+and without
+.Fl -json ,
+after the recommendation prompt
+.Dq Apply these steps? [y/N/e] .
+.Bl -bullet -compact
+.It
+.Cm y / yes
+turns the recommendation into a plan and dry-runs it unless
+.Fl -yes
+was already given.
+After a dry-run, ask
+.Dq Apply for real? [y/N]
+which is the same gate as
+.Nm apply Fl -yes .
+Enter, empty, and EOF default to
+.Cm N
+and do not mutate.
+.It
+.Cm e / edit
+writes the plan JSON to a temp file, opens
+.Ev VISUAL ,
+then
+.Ev EDITOR ,
+then
+.Ic vi ,
+re-reads the file
+.Pq JSON plan or a command list
+and uses the same apply confirm.
+An aborted or empty editor does not apply.
+.It
+.Cm n
+or EOF prints
+.Dq nothing applied
+and exits 0.
+.El
+Invalid keys re-prompt.
+Non-TTY,
+.Fl -json ,
+.Ev HAWKEYE_JSON ,
+and MCP consult never prompt.
+Scripts keep
+.Nm consult
+then
+.Nm plan
+then
+.Nm apply Fl -dry-run
+or
+.Nm apply Fl -yes .
 On a read-only root the first skill is
 .Cm unlock-rw ,
 not
@@ -125,12 +174,27 @@ Prefer JSON output for
 .Nm plan ,
 and
 .Nm doctor .
+Consult does not prompt.
 .It Fl -dry-run
 Force apply dry-run
 .Pq default .
+Wins over
+.Fl -yes
+on
+.Nm apply
+and on a TTY consult confirm.
 .It Fl -yes
 Permit mutation for
 .Nm apply .
+On a TTY
+.Nm consult ,
+skips the second
+.Dq Apply for real?
+prompt after the operator answers
+.Cm y
+or finishes an edit.
+The first prompt still defaults to
+.Cm N .
 .El
 .Sh SIGNALS
 .Bl -tag -width indent

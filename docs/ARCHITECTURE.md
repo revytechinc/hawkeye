@@ -35,6 +35,7 @@ or MCP payload.
 
 ```mermaid
 flowchart TD
+    ConsultTTY["TTY consult y/e"] --> Mode
     In["plan JSON"] --> Mode{"ResolveMode: default dry-run"}
     Mode -->|"no --yes"| Dry["dry-run: no exec"]
     Mode -->|"--yes and operator"| Actor{"actor"}

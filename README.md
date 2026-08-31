@@ -28,7 +28,7 @@ execs as root.
 
 | Command | What it does |
 |---------|----------------|
-| `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. No writes. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. |
+| `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. TTY asks `[y/N/e]` to apply or edit; default N. `--json`, pipes, and MCP do not prompt. Mutation still needs `--yes` or a second y. |
 | `hawkeye plan` | Propose steps. No mutation. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the JSON plan. |
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |
 | `hawkeye doctor` | Service health: config, perms, pidfile, deps, headroom. Human + JSON. Non-zero if unhealthy. |
