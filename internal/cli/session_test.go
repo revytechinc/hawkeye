@@ -41,11 +41,9 @@ func hasSessionPrompt(out string) bool {
 }
 
 func countSessionPrompts(out string) int {
-	n := strings.Count(out, "\n> ")
-	if strings.HasPrefix(out, "> ") {
-		n++
-	}
-	return n
+	// Tests feed stdin without terminal echo, so empty-line re-prompts
+	// appear as "> > > " on one line.
+	return strings.Count(out, "> ")
 }
 
 func assertNoMachineChrome(t *testing.T, out string) {
@@ -136,7 +134,10 @@ func TestSession_TTY_HelpAndQuestion(t *testing.T) {
 	if !strings.Contains(out, "y") || !strings.Contains(out, "e") {
 		t.Fatalf("help must mention y/e:\n%s", out)
 	}
-	if strings.Contains(out, "Apply these steps?") {
+	if strings.Contains(out, "Apply these steps? [y/N/e] ") {
+		t.Fatalf("help must not open the apply prompt:\n%s", out)
+	}
+	if strings.Contains(out, "ZFS readonly pool") {
 		t.Fatalf("help must not consult:\n%s", out)
 	}
 }

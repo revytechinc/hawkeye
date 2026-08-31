@@ -103,7 +103,9 @@ func RunEnv(env Env) int {
 	}
 
 	switch fs.cmd {
-	case "", "help":
+	case "":
+		return cmdSession(env, fs, cfg)
+	case "help":
 		fmt.Fprint(env.Stdout, usage())
 		return 0
 	case "version":
@@ -198,8 +200,12 @@ func parse(args []string) flagset {
 		}
 	}
 	if len(rest) > 0 {
-		fs.cmd = rest[0]
-		fs.rest = rest[1:]
+		if isKnownCommand(rest[0]) {
+			fs.cmd = rest[0]
+			fs.rest = rest[1:]
+		} else {
+			fs.rest = rest
+		}
 	}
 	return fs
 }
@@ -208,6 +214,8 @@ func usage() string {
 	return `hawkeye — FreeBSD diagnostic/ops doctor (MASH)
 
 Usage:
+  hawkeye                      Panic-path session on a terminal (type the problem)
+  hawkeye [query]              Consult, then stay in the session on a TTY
   hawkeye [--config PATH] [--check-config] [--json] <command> [args]
 
 Commands:
@@ -285,45 +293,7 @@ func cmdConsult(env Env, fs flagset, cfg config.Config) int {
 		b, _ := io.ReadAll(env.Stdin)
 		q = strings.TrimSpace(string(b))
 	}
-	snap := probe.Probe(env.Host)
-	st := openKnowledge(env, cfg, snap)
-	if st != nil {
-		defer st.Close()
-	}
-	var comp llm.Completer
-	if snap.Tier >= 1 && cfg.LLM.Local.Backend != "" {
-		hr := headroom.Live(snap.GPUPresent)
-		comp = llm.Local{
-			Backend:    cfg.LLM.Local.Backend,
-			ModelPath:  cfg.LLM.Local.ModelPath,
-			PreferGPU:  cfg.LLM.Local.PreferGPU,
-			RequireGPU: cfg.LLM.Local.RequireGPU,
-			GPUPresent: snap.GPUPresent,
-			Headroom:   hr,
-			RAMMin:     cfg.Resources.RAMMinFreeBytes,
-			VRAMMin:    cfg.Resources.GPUVRAMMinFreeBytes,
-		}
-	}
-	res, err := consult.Run(q, snap, st, comp)
-	if err != nil {
-		fmt.Fprintln(env.Stderr, err)
-		return 1
-	}
-	if wantJSON(fs, env.Getenv) {
-		b, err := res.JSON()
-		if err != nil {
-			fmt.Fprintln(env.Stderr, err)
-			return 1
-		}
-		_, _ = env.Stdout.Write(append(b, '\n'))
-		return 0
-	}
-	fmt.Fprint(env.Stdout, res.Human())
-	if !env.TTY {
-		return 0
-	}
-	fmt.Fprintln(env.Stdout)
-	return promptConsultApply(env, fs, cfg, makePlan(q, snap))
+	return runConsultQuery(env, fs, cfg, q, nil)
 }
 
 func wantJSON(fs flagset, getenv func(string) string) bool {

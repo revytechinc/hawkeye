@@ -3,7 +3,10 @@
 
 package cli
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsKnownCommand(t *testing.T) {
 	for _, c := range []string{"consult", "plan", "apply", "doctor", "mcp", "update", "init", "version", "help"} {
@@ -29,6 +32,17 @@ func TestParse_UnknownWordsAreQuery(t *testing.T) {
 	fs = parse([]string{"consult", "zfs"})
 	if fs.cmd != "consult" || len(fs.rest) != 1 || fs.rest[0] != "zfs" {
 		t.Fatalf("consult: cmd=%q rest=%v", fs.cmd, fs.rest)
+	}
+}
+
+func TestSessionNeedTTYAndHelp(t *testing.T) {
+	got := sessionNeedTTY()
+	if !strings.Contains(got, "terminal") || !strings.Contains(got, "hawkeye") {
+		t.Fatalf("need-tty: %s", got)
+	}
+	h := sessionHelpText()
+	if !strings.Contains(h, "Type the problem") || !strings.Contains(h, "[y/N/e]") {
+		t.Fatalf("help: %s", h)
 	}
 }
 

@@ -447,3 +447,41 @@ GPU absent is ok. Exit 1.
 ENVIRONMENT SEE ALSO). `config.json.sample` documented in `hawkeye(8)` FILES
 and `hawkeye.conf(5)`.
 
+## 15. Bare hawkeye operator session (2026-08-31)
+
+T017: `hawkeye` with no command on a TTY is the panic path (like
+`ollama run`). Each line is a consult; then the T015 apply prompt
+`Apply these steps? [y/N/e]`. N/Enter returns to `>`. `--yes` still
+required to land. `--json` never enters the REPL. Non-TTY with no args
+prints a reminder to run on a terminal (no pipe hang). Known
+subcommands and MCP are unchanged. Positional words that are not a
+command are the first query.
+
+Red: no-args still dumped usage; `hawkeye ZFS …` was `unknown command`.
+
+Green:
+
+`go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ok  github.com/revytechinc/hawkeye/internal/apply     coverage: 98.8%
+ok  github.com/revytechinc/hawkeye/internal/cli       coverage: 84.6%
+ok  github.com/revytechinc/hawkeye/internal/consult   coverage: 96.2%
+ok  github.com/revytechinc/hawkeye/internal/redact    coverage: 100.0%
+total: (statements) 88.1%
+```
+
+`cmdSession`, `runREPL`, `isKnownCommand`, apply `ResolveMode` 100%.
+`runConsultQuery` 84.6% (JSON/consult error paths). Redact 100%.
+Tests use FAKE secret fixtures only.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json` and `printf '' | hawkeye`: 
+`hawkeye: run hawkeye on a terminal (type the problem at >, then y/N/e).`
+`hawkeye doctor`: UNHEALTHY (knowledge missing), GPU absent ok. Exit 1.
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present; no-args documented as the panic path in `hawkeye(8)`.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+

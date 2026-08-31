@@ -28,6 +28,7 @@ execs as root.
 
 | Command | What it does |
 |---------|----------------|
+| `hawkeye` | Panic path. On a TTY, type the problem at `>`. Each line is a consult, then `Apply these steps? [y/N/e]`. `quit`/`exit`/`q`/Ctrl-D leave. Non-TTY with no args prints a reminder to run on a terminal. `--json` never enters the session. |
 | `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. TTY asks `[y/N/e]` to apply or edit; default N. `--json`, pipes, and MCP do not prompt. Mutation still needs `--yes` or a second y. |
 | `hawkeye plan` | Propose steps. No mutation. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the JSON plan. |
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |

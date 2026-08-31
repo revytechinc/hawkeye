@@ -154,6 +154,7 @@ Rebase onto the branch, keep tests green, do not force-push `main`.
 ### Key commands
 
 ```sh
+hawkeye
 hawkeye --check-config
 hawkeye init
 hawkeye consult "zpool degraded"
