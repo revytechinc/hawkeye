@@ -267,9 +267,13 @@ func TestHelpAndUnknown(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "consult") {
 		t.Fatal(out)
 	}
-	code, _, err := run(t, []string{"nope"}, "", fakeHost{}, nil)
-	if code == 0 || err == "" {
-		t.Fatal("unknown")
+	// Words that are not a known subcommand are a consult query (panic path).
+	code, out, err := run(t, []string{"nope"}, "", fakeHost{ro: true, rescue: true}, nil)
+	if code != 0 {
+		t.Fatalf("positional query: %d %s %s", code, out, err)
+	}
+	if strings.Contains(err, "unknown command") {
+		t.Fatalf("unknown command must not fire for a query: %s", err)
 	}
 }
 

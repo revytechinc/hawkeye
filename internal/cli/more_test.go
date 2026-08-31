@@ -107,8 +107,14 @@ func TestDoctorHuman(t *testing.T) {
 
 func TestHelpNoArgs(t *testing.T) {
 	code, out, _ := run(t, []string{}, "", fakeHost{}, nil)
-	if code != 0 || !strings.Contains(out, "Usage") {
+	if code != 0 {
 		t.Fatal(out)
+	}
+	if hasSessionPrompt(out) {
+		t.Fatalf("non-TTY no-args must not hang in a REPL:\n%s", out)
+	}
+	if !strings.Contains(strings.ToLower(out), "terminal") {
+		t.Fatalf("must say run hawkeye on a terminal:\n%s", out)
 	}
 }
 
