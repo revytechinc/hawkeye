@@ -12,14 +12,17 @@ WWW=		https://github.com/revytechinc/hawkeye
 LICENSE=	BSD3CLAUSE
 LICENSE_FILE=	${WRKSRC}/LICENSE
 
+RUN_DEPENDS=	hawkeye-data>0:sysutils/hawkeye-data
+
 USES=		go:modules
 GO_MODULE=	github.com/revytechinc/hawkeye
 GO_TARGET=	./cmd/hawkeye
 
 # This port ships the hawkeye binary, man pages, sample JSON config, and
-# rc.d script only. The diagnostic knowledge corpus is the sibling
-# repository/port hawkeye-data (https://github.com/revytechinc/hawkeye-data).
-# Do not vendor that corpus here.
+# rc.d script. The diagnostic knowledge corpus is RUN_DEPENDS hawkeye-data
+# (https://github.com/revytechinc/hawkeye-data). pkg install hawkeye pulls
+# the kit; do not vendor the corpus here. hawkeye-data must not depend on
+# hawkeye (no cycle).
 
 USE_RC_SUBR=	hawkeye
 
