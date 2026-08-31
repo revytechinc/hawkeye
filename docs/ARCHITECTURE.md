@@ -41,8 +41,10 @@ flowchart TD
     Mode -->|"--yes and operator"| Actor{"actor"}
     Actor -->|"ActorLLM"| Refuse["refuse: LLM must not exec as root"]
     Actor -->|"ActorMCP privileged"| Dry
-    Actor -->|"ActorMCP unprivileged + yes"| Exec["SysExecutor + audit log"]
+    Actor -->|"ActorMCP unprivileged + yes"| Exec["SysExecutor session + audit"]
     Actor -->|"ActorOperator"| Exec
+    Exec -->|"step fail"| Fail["Applied=false, exit 1"]
+    Exec -->|"audit dir unwritable"| Degrade["stderr note, still land"]
 ```
 
 ## Knowledge search order

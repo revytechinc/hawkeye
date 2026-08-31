@@ -358,7 +358,6 @@ func cmdApply(env Env, fs flagset, cfg config.Config) int {
 		fmt.Fprintln(env.Stderr, err)
 		return 1
 	}
-	raw = []byte(redact.String(string(raw)))
 	if len(strings.TrimSpace(string(raw))) == 0 {
 		fmt.Fprintln(env.Stderr, "hawkeye apply: empty plan")
 		return 1
@@ -367,18 +366,23 @@ func cmdApply(env Env, fs flagset, cfg config.Config) int {
 		fmt.Fprintln(env.Stderr, "hawkeye apply: plan JSON:", err)
 		return 1
 	}
+	p = redactPlan(p)
 	res, err := executePlan(env, cfg, p, mode)
-	if err != nil {
+	if err != nil && len(res.Steps) == 0 {
 		fmt.Fprintln(env.Stderr, err)
 		return 1
 	}
 	enc := json.NewEncoder(env.Stdout)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(res); err != nil {
+	if encErr := enc.Encode(res); encErr != nil {
 		return 1
 	}
-	if mode == apply.ModeApply && !res.DryRun {
-		return 0
+	if err != nil {
+		fmt.Fprintln(env.Stderr, err)
+		return 1
+	}
+	if mode == apply.ModeApply && !res.DryRun && !res.Applied {
+		return 1
 	}
 	return 0
 }

@@ -147,10 +147,6 @@ func readPromptLine(in *bufio.Reader) (string, error) {
 
 func printApply(env Env, cfg config.Config, plan apply.Plan, mode apply.Mode) int {
 	res, err := executePlan(env, cfg, plan, mode)
-	if err != nil {
-		fmt.Fprintln(env.Stderr, err)
-		return 1
-	}
 	for _, s := range res.Steps {
 		if s.Output != "" {
 			fmt.Fprintln(env.Stdout, s.Output)
@@ -159,8 +155,16 @@ func printApply(env Env, cfg config.Config, plan apply.Plan, mode apply.Mode) in
 			fmt.Fprintln(env.Stdout, s.Error)
 		}
 	}
+	if err != nil {
+		fmt.Fprintln(env.Stderr, err)
+		return 1
+	}
 	if res.Applied {
 		fmt.Fprintln(env.Stdout, "applied")
+		return 0
+	}
+	if mode == apply.ModeApply {
+		return 1
 	}
 	return 0
 }
@@ -170,13 +174,13 @@ func executePlan(env Env, cfg config.Config, p apply.Plan, mode apply.Mode) (app
 }
 
 func executePlanActor(env Env, cfg config.Config, p apply.Plan, mode apply.Mode, actor apply.Actor) (apply.Result, error) {
-	auditor, err := applyAuditor(cfg, mode)
+	auditor, err := applyAuditor(cfg, mode, env.Stderr)
 	if err != nil {
 		return apply.Result{}, err
 	}
 	ex := env.Exec
 	if ex == nil {
-		ex = apply.SysExecutor{}
+		ex = &apply.SysExecutor{}
 	}
 	return apply.Execute(p, mode, actor, ex, auditor)
 }
@@ -189,17 +193,25 @@ func mcpApply(env Env, cfg config.Config, p apply.Plan, yes bool) (any, error) {
 	return executePlanActor(env, cfg, p, mode, apply.ActorMCP)
 }
 
-func applyAuditor(cfg config.Config, mode apply.Mode) (apply.Auditor, error) {
+func applyAuditor(cfg config.Config, mode apply.Mode, stderr io.Writer) (apply.Auditor, error) {
 	if cfg.AuditLog == "" {
 		return apply.NopAuditor{}, nil
 	}
 	dir := filepath.Dir(cfg.AuditLog)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		if mode == apply.ModeApply {
-			return nil, fmt.Errorf("hawkeye apply: audit log %s: %w", cfg.AuditLog, err)
+		if mode == apply.ModeApply && stderr != nil {
+			fmt.Fprintf(stderr, "hawkeye apply: audit log %s: %v (continuing without audit)\n", cfg.AuditLog, err)
 		}
 		return apply.NopAuditor{}, nil
 	}
+	fh, err := os.OpenFile(cfg.AuditLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		if mode == apply.ModeApply && stderr != nil {
+			fmt.Fprintf(stderr, "hawkeye apply: audit log %s: %v (continuing without audit)\n", cfg.AuditLog, err)
+		}
+		return apply.NopAuditor{}, nil
+	}
+	_ = fh.Close()
 	return &audit.File{Path: cfg.AuditLog}, nil
 }
 

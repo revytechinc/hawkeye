@@ -4,15 +4,23 @@
 package apply
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 var (
 	ErrLLMMustNotExec = errors.New("llm must not execute privileged apply; operator CLI is the only mutator")
 	ErrNilExecutor    = errors.New("executor is required for apply")
+	ErrStepFailed     = errors.New("one or more apply steps failed")
 )
 
 type Mode int
@@ -115,6 +123,7 @@ func Execute(plan Plan, mode Mode, actor Actor, exec Executor, auditor Auditor) 
 		auditor = NopAuditor{}
 	}
 	res := Result{DryRun: true}
+	failed := false
 
 	if actor == ActorLLM && plan.Privileged() && mode == ModeApply {
 		_ = auditor.Record(plan, mode, actor, res)
@@ -143,38 +152,145 @@ func Execute(plan Plan, mode Mode, actor Actor, exec Executor, auditor Auditor) 
 		sr.Output = strings.TrimSpace(strings.TrimSpace(out) + "\n" + strings.TrimSpace(errOut))
 		if err != nil {
 			sr.Error = err.Error()
+			failed = true
 		}
 		res.Steps = append(res.Steps, sr)
 	}
 	if mode == ModeApply {
-		res.Applied = true
+		res.Applied = !failed
 		res.DryRun = false
 	}
 	if err := auditor.Record(plan, mode, actor, res); err != nil {
 		return res, err
 	}
+	if failed {
+		return res, ErrStepFailed
+	}
 	return res, nil
 }
 
-type SysExecutor struct{}
+// SysExecutor runs argv. Stored playbook lines (single-element argv that
+// needs a shell) share one /bin/sh session so ROOTDS= and export PATH
+// persist into later zfs set "$ROOTDS" steps. Non-shell argv is one-shot.
+type SysExecutor struct {
+	// Shell is the session interpreter. Empty means /bin/sh.
+	Shell  string
+	mu     sync.Mutex
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout *bufio.Reader
+	errBuf bytes.Buffer
+}
 
 func needsShell(line string) bool {
 	return strings.ContainsAny(line, " \t|$;&<>(){}'\"`\n") || strings.Contains(line, "=")
 }
 
-func (SysExecutor) Run(argv []string) (string, string, error) {
+func (s *SysExecutor) Run(argv []string) (string, string, error) {
 	if len(argv) == 0 {
 		return "", "", errors.New("empty argv")
 	}
-	var cmd *exec.Cmd
 	if len(argv) == 1 && needsShell(argv[0]) {
-		cmd = exec.Command("/bin/sh", "-c", argv[0])
-	} else {
-		cmd = exec.Command(argv[0], argv[1:]...)
+		return s.runShellLine(argv[0])
 	}
+	cmd := exec.Command(argv[0], argv[1:]...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return stdout.String(), stderr.String(), err
+}
+
+func (s *SysExecutor) Close() error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.resetLocked()
+}
+
+func (s *SysExecutor) runShellLine(line string) (string, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureLocked(); err != nil {
+		return "", "", err
+	}
+	token := fmt.Sprintf("HAWKEYE_DONE_%d_%d", os.Getpid(), time.Now().UnixNano())
+	beforeErr := s.errBuf.Len()
+	script := line + "\n" + "printf '%s %d\\n' '" + token + "' $?\n"
+	if _, err := io.WriteString(s.stdin, script); err != nil {
+		_ = s.resetLocked()
+		return "", "", err
+	}
+	var out strings.Builder
+	for {
+		rec, err := s.stdout.ReadString('\n')
+		if err != nil {
+			_ = s.resetLocked()
+			return out.String(), s.errSince(beforeErr), err
+		}
+		if strings.HasPrefix(rec, token+" ") {
+			codeStr := strings.TrimSpace(strings.TrimPrefix(rec, token+" "))
+			code, _ := strconv.Atoi(codeStr)
+			stderr := s.errSince(beforeErr)
+			if code != 0 {
+				return out.String(), stderr, fmt.Errorf("exit status %d", code)
+			}
+			return out.String(), stderr, nil
+		}
+		out.WriteString(rec)
+	}
+}
+
+func (s *SysExecutor) errSince(n int) string {
+	b := s.errBuf.Bytes()
+	if n >= len(b) {
+		return ""
+	}
+	return string(b[n:])
+}
+
+func (s *SysExecutor) ensureLocked() error {
+	if s.cmd != nil && s.cmd.Process != nil && s.stdin != nil && s.stdout != nil {
+		return nil
+	}
+	_ = s.resetLocked()
+	shell := "/bin/sh"
+	if s.Shell != "" {
+		shell = s.Shell
+	}
+	cmd := exec.Command(shell)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		_ = stdin.Close()
+		return err
+	}
+	cmd.Stderr = &s.errBuf
+	if err := cmd.Start(); err != nil {
+		_ = stdin.Close()
+		return err
+	}
+	s.cmd = cmd
+	s.stdin = stdin
+	s.stdout = bufio.NewReader(stdout)
+	return nil
+}
+
+func (s *SysExecutor) resetLocked() error {
+	var err error
+	if s.stdin != nil {
+		_ = s.stdin.Close()
+		s.stdin = nil
+	}
+	if s.cmd != nil {
+		err = s.cmd.Wait()
+		s.cmd = nil
+	}
+	s.stdout = nil
+	return err
 }

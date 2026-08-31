@@ -120,6 +120,17 @@ Created mode
 .It Va audit_log
 JSON-lines apply audit log.
 Mode 0600 when created.
+Default
+.Pa /var/log/hawkeye/audit.log .
+If the directory cannot be created
+.Pq read-only root or missing
+.Pa /var
+during
+.Nm hawkeye Cm apply Fl -yes
+.Ns ,
+apply still lands; the skip is noted on stderr
+.Pq dry-run already uses a no-op auditor
+.Ns .
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width indent
