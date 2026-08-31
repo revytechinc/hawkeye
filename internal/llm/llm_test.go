@@ -65,6 +65,16 @@ func writeChatOnlyLlamaCLI(t *testing.T, canned string) string {
 
 func vram(n int64) *int64 { return &n }
 
+func nglIs(capture []byte, n string) bool {
+	lines := strings.Split(string(capture), "\n")
+	for i, line := range lines {
+		if line == "-ngl" && i+1 < len(lines) && lines[i+1] == n {
+			return true
+		}
+	}
+	return false
+}
+
 func TestLocal_LlamaCLIGetsSingleTurn(t *testing.T) {
 	dir := t.TempDir()
 	capture := filepath.Join(dir, "argv.txt")
@@ -226,10 +236,10 @@ func TestLocal_JailLikeGPUNullVRAMUsesCPUNotSkip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(got), "99") {
+	if nglIs(got, "99") {
 		t.Fatalf("null VRAM must not pass -ngl 99: %s", got)
 	}
-	if !strings.Contains(string(got), "\n0\n") {
+	if !nglIs(got, "0") {
 		t.Fatalf("null VRAM must pass -ngl 0: %s", got)
 	}
 }
@@ -405,7 +415,7 @@ func TestLocal_MissingGPUDoesNotBlockCPUJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), "-ngl") || !strings.Contains(string(got), "\n0\n") {
+	if !nglIs(got, "0") {
 		t.Fatalf("CPU fallback must pass -ngl 0: %s", got)
 	}
 }
@@ -475,7 +485,7 @@ func TestLocal_PreferGPUPassesLayersWhenPresent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), "99") {
+	if !nglIs(got, "99") {
 		t.Fatalf("GPU path must pass -ngl 99: %s", got)
 	}
 }

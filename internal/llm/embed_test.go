@@ -107,8 +107,11 @@ func TestLocal_EmbedNullVRAMUsesCPU(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(got), "99") {
+	if nglIs(got, "99") {
 		t.Fatalf("null VRAM must not pass -ngl 99: %s", got)
+	}
+	if !nglIs(got, "0") {
+		t.Fatalf("null VRAM must pass -ngl 0: %s", got)
 	}
 }
 
@@ -139,7 +142,7 @@ func TestLocal_EmbedPreferGPU(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), "99") {
+	if !nglIs(got, "99") {
 		t.Fatalf("GPU then CPU must pass -ngl 99: %s", got)
 	}
 }

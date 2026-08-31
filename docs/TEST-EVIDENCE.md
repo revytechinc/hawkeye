@@ -1270,3 +1270,8 @@ has no `--single-turn`. Leftovers stripped. PATH prefers
 `--check-config` defaults: exit 0.
 `TestResolveMode_DefaultIsDryRun` unchanged.
 No GGUF vendored. No hang of the panic session. No hawkeye-www.
+
+CI on `0a8834c` failed `TestLocal_JailLikeGPUNullVRAMUsesCPUNotSkip` because
+`strings.Contains(capture, "99")` matched a digit sequence in the temp
+path while argv was `-ngl 0`. Assertions now match the `-ngl` argument
+exactly (`nglIs`).
