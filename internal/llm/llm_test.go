@@ -37,12 +37,44 @@ func writeFakeLlama(t *testing.T, capture, canned string) string {
 
 func writeFakeLlamaNamed(t *testing.T, name, capture, canned string) string {
 	t.Helper()
-	dir := t.TempDir()
+	return writeFakeAt(t, t.TempDir(), name, capture, canned)
+}
+
+func writeFakeAt(t *testing.T, dir, name, capture, canned string) string {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	bin := filepath.Join(dir, name)
 	script := "#!/bin/sh\n"
 	if capture != "" {
 		script += "for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + capture + "\"; done\n"
 	}
+	script += "printf '%s\\n' '" + canned + "'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+// writeJailEmbeddingStub mimics llama-embedding 9426: rejects --embedding
+// and --no-display-prompt, prints a FLOAT32 array otherwise.
+func writeJailEmbeddingStub(t *testing.T, dir, capture, canned string) string {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(dir, "llama-embedding")
+	script := "#!/bin/sh\n"
+	if capture != "" {
+		script += "for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + capture + "\"; done\n"
+	}
+	script += "for a in \"$@\"; do\n"
+	script += "  if [ \"$a\" = \"--embedding\" ] || [ \"$a\" = \"--no-display-prompt\" ]; then\n"
+	script += "    echo 'error: invalid argument: '" + "\"$a\" >&2\n"
+	script += "    exit 1\n"
+	script += "  fi\n"
+	script += "done\n"
 	script += "printf '%s\\n' '" + canned + "'\n"
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)

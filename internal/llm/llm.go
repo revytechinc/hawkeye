@@ -122,6 +122,52 @@ func resolveBin(explicit string) string {
 	return ""
 }
 
+// wellKnownEmbedBins are FreeBSD prefixes for llama-embedding when PATH
+// is empty. llm.local.bin stays the Complete binary.
+var wellKnownEmbedBins = []string{"/usr/local/bin/llama-embedding"}
+
+func isEmbedBin(bin string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(bin)))
+	return base == "llama-embedding" || strings.HasPrefix(base, "llama-embedding.")
+}
+
+func resolveNamed(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return ""
+	}
+	p, err := lookPath(name)
+	if err != nil || p == "" {
+		return ""
+	}
+	return p
+}
+
+// resolveEmbedBin finds llama-embedding. completeBin is llm.local.bin
+// (llama-completion / llama-cli) and is not reused for Embed.
+// Jail config keeps one bin for Complete; operators do not hand-edit
+// JSON when llama-embedding is on PATH or beside that bin.
+func resolveEmbedBin(completeBin string) string {
+	completeBin = strings.TrimSpace(completeBin)
+	if isEmbedBin(completeBin) {
+		return completeBin
+	}
+	if p := resolveNamed("llama-embedding"); p != "" {
+		return p
+	}
+	if completeBin != "" {
+		sib := filepath.Join(filepath.Dir(completeBin), "llama-embedding")
+		if p := resolveNamed(sib); p != "" {
+			return p
+		}
+	}
+	for _, p := range wellKnownEmbedBins {
+		if got := resolveNamed(p); got != "" {
+			return got
+		}
+	}
+	return ""
+}
+
 func needsSingleTurn(bin string) bool {
 	base := strings.ToLower(filepath.Base(strings.TrimSpace(bin)))
 	return base == "llama-cli" || strings.HasPrefix(base, "llama-cli.")
