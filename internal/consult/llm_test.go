@@ -4,6 +4,7 @@
 package consult_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/revytechinc/hawkeye/internal/consult"
@@ -18,5 +19,9 @@ func TestRun_Tier1LLMSkipped(t *testing.T) {
 	}
 	if r.LLM != nil {
 		t.Fatal("none completer should skip")
+	}
+	joined := strings.Join(r.Notes, " ")
+	if !strings.Contains(joined, "llm skipped") {
+		t.Fatalf("--json may still note the skip: %v", r.Notes)
 	}
 }

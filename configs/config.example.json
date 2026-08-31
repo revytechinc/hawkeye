@@ -15,6 +15,7 @@
   "llm": {
     "local": {
       "backend": "llama.cpp",
+      "bin": "",
       "model_path": "",
       "prefer_gpu": true,
       "require_gpu": false
@@ -24,6 +25,10 @@
       "endpoint": "",
       "api_key_env": "HAWKEYE_LLM_API_KEY"
     }
+  },
+  "update": {
+    "source": "",
+    "dest": "/usr/local/share/hawkeye/knowledge.sqlite"
   },
   "resources": {
     "ram_min_free_bytes": 268435456,

@@ -148,6 +148,30 @@ func TestHuman_EmptyHitsNotJSON(t *testing.T) {
 	}
 }
 
+func TestHuman_LocalCompletionAfterPlaybookHits(t *testing.T) {
+	r := consult.Result{
+		Query: "ZFS root is read-only after boot",
+		Tier:  1,
+		Hits:  jailOrderHits(),
+		LLM:   &llm.Response{Text: "canned local completion: check zpool status", Backend: "llama.cpp"},
+	}
+	got := r.Human()
+	if strings.Contains(got, "llm skipped") || strings.Contains(got, "skeleton") {
+		t.Fatalf("TTY must not print operator guts:\n%s", got)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(got), "Remount ZFS root read-write\n") {
+		t.Fatalf("must lead with the playbook:\n%s", got)
+	}
+	idxPlay := strings.Index(got, "Remount ZFS root read-write")
+	idxLLM := strings.Index(got, "canned local completion: check zpool status")
+	if idxLLM < 0 {
+		t.Fatalf("local completion missing after playbook hits:\n%s", got)
+	}
+	if idxLLM < idxPlay {
+		t.Fatalf("local completion must follow playbook hits:\n%s", got)
+	}
+}
+
 func TestHuman_IncludesLLMTextWithoutJSONKeys(t *testing.T) {
 	r := consult.Result{
 		Query: "zpool degraded",

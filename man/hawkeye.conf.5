@@ -82,9 +82,30 @@ XDG data dirs are also searched.
 Local backend.
 Default
 .Li llama.cpp .
+.It Va llm.local.bin
+Path to a local llama.cpp-style binary
+.Pq
+.Nm llama-cli ,
+.Nm llama.cpp ,
+or
+.Nm llama-server
+invoked as a one-shot completer
+.Ns .
+Empty means search
+.Ev PATH
+for
+.Nm llama-cli
+then
+.Nm llama.cpp .
+Override with
+.Ev HAWKEYE_LLM_BIN .
 .It Va llm.local.model_path
-Path to a local model.
-Empty means LLM is optional.
+Path to a local GGUF model.
+Empty means LLM is optional
+.Pq quiet TTY skip; no model is vendored
+.Ns .
+Override with
+.Ev HAWKEYE_LLM_MODEL .
 .It Va llm.local.prefer_gpu
 Try GPU then CPU.
 .It Va llm.local.require_gpu
@@ -101,6 +122,22 @@ Name of the environment variable that holds the API key.
 Default
 .Ev HAWKEYE_LLM_API_KEY .
 The key itself is never stored in JSON.
+.It Va update.source
+Path to a hawkeye-data
+.Pa knowledge.sqlite
+artifact.
+Empty means
+.Nm hawkeye Cm update
+skips
+.Pq rc start stays healthy
+.Ns .
+Prefer
+.Ev HAWKEYE_UPDATE_SOURCE
+over putting a path that might rotate in the file.
+.It Va update.dest
+Destination sqlite path.
+Default
+.Pa /usr/local/share/hawkeye/knowledge.sqlite .
 .It Va resources.ram_min_free_bytes
 Refuse RAM-consuming jobs when free RAM is below this.
 .It Va resources.cpu_max_pct
@@ -136,6 +173,14 @@ apply still lands; the skip is noted on stderr
 .Bl -tag -width indent
 .It Ev HAWKEYE_CONFIG
 Override config path.
+.It Ev HAWKEYE_LLM_MODEL
+Local GGUF path.
+Overrides
+.Va llm.local.model_path .
+.It Ev HAWKEYE_LLM_BIN
+Local llama.cpp-style binary.
+Overrides
+.Va llm.local.bin .
 .It Ev HAWKEYE_LLM_API_KEY
 Remote LLM API key
 .Pq never placed in the JSON file .
@@ -167,12 +212,24 @@ emit JSON on stdout the same as
 Unset means the operator session.
 .It Ev HAWKEYE_KNOWLEDGE_PATH
 Override knowledge search path for tests and rescue overlays.
-When set, compiled defaults and XDG paths are not searched.
-.It Ev HAWKEYE_DATA_ARTIFACT
+When set, compiled defaults
+.Pq
+.Pa /boot/hawkeye
+then
+.Pa /usr/local/share/hawkeye
+.Ns
+and XDG paths are not searched.
+.It Ev HAWKEYE_UPDATE_SOURCE
 Source
 .Pa knowledge.sqlite
 for
 .Nm hawkeye Cm update .
+Unset means skip
+.Pq no error
+.Ns .
+.It Ev HAWKEYE_DATA_ARTIFACT
+Legacy alias for
+.Ev HAWKEYE_UPDATE_SOURCE .
 .It Ev VISUAL , Ev EDITOR
 Editor for
 .Nm hawkeye Cm consult

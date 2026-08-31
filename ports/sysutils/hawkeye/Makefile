@@ -26,9 +26,30 @@ GO_TARGET=	./cmd/hawkeye
 
 USE_RC_SUBR=	hawkeye
 
+# RESCUE is off by default. Thin bastille jails often have /rescue as a
+# dangling symlink; do not assume it is a real directory. Staging uses
+# STAGEDIR (DESTDIR-safe). Local inference is optional; do not depend on
+# an uninstalled llama.cpp port.
+OPTIONS_DEFINE=	RESCUE
+RESCUE_DESC=	Stage /rescue/hawkeye when /rescue is a real directory
+
 PLIST_FILES=	bin/hawkeye \
 		etc/cloudbsd/hawkeye/config.json.sample \
 		share/man/man8/hawkeye.8.gz \
 		share/man/man5/hawkeye.conf.5.gz
+
+.include <bsd.port.options.mk>
+
+.if ${PORT_OPTIONS:MRESCUE}
+PLIST_FILES+=	/rescue/hawkeye
+PLIST_DIRS+=	/boot/hawkeye
+.endif
+
+post-install:
+.if ${PORT_OPTIONS:MRESCUE}
+	${MKDIR} ${STAGEDIR}/rescue
+	${INSTALL_PROGRAM} ${STAGEDIR}${PREFIX}/bin/hawkeye ${STAGEDIR}/rescue/hawkeye
+	${MKDIR} ${STAGEDIR}/boot/hawkeye
+.endif
 
 .include <bsd.port.mk>

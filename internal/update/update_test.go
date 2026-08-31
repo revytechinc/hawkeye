@@ -38,3 +38,35 @@ func TestRun_CopiesArtifactWhenWritable(t *testing.T) {
 		t.Fatalf("got %q", b)
 	}
 }
+
+func TestRun_EmptySourceSkips(t *testing.T) {
+	got, err := update.Run("", "/usr/local/share/hawkeye/knowledge.sqlite", probe.Snapshot{RootRO: false, Tier: 1})
+	if err != nil {
+		t.Fatalf("unset source must skip with no error (rc start): %v", err)
+	}
+	if got != "" {
+		t.Fatalf("skip must not claim a destination write: %q", got)
+	}
+}
+
+func TestRun_EmptySourceSkipsEvenOnRO(t *testing.T) {
+	got, err := update.Run("", "", probe.Snapshot{RootRO: true, Tier: 0})
+	if err != nil {
+		t.Fatalf("unset source must skip so rc start stays healthy on RO: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("skip must not claim a write: %q", got)
+	}
+}
+
+func TestResolveDest_DefaultsToSystemKnowledge(t *testing.T) {
+	if got := update.ResolveDest(""); got != "/usr/local/share/hawkeye/knowledge.sqlite" {
+		t.Fatalf("dest default = %q", got)
+	}
+	if got := update.ResolveDest("/tmp/kit/knowledge.sqlite"); got != "/tmp/kit/knowledge.sqlite" {
+		t.Fatalf("explicit dest = %q", got)
+	}
+	if update.DefaultDest != "/usr/local/share/hawkeye/knowledge.sqlite" {
+		t.Fatalf("DefaultDest = %q", update.DefaultDest)
+	}
+}

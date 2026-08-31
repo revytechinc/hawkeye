@@ -26,6 +26,7 @@ type Knowledge struct {
 
 type LocalLLM struct {
 	Backend    string `json:"backend"`
+	Bin        string `json:"bin"`
 	ModelPath  string `json:"model_path"`
 	PreferGPU  bool   `json:"prefer_gpu"`
 	RequireGPU bool   `json:"require_gpu"`
@@ -49,11 +50,17 @@ type Resources struct {
 	GPUVRAMMinFreeBytes *int64   `json:"gpu_vram_min_free_bytes"`
 }
 
+type Update struct {
+	Source string `json:"source"`
+	Dest   string `json:"dest"`
+}
+
 type Config struct {
 	LogLevel  string    `json:"log_level"`
 	Listen    Listen    `json:"listen"`
 	Knowledge Knowledge `json:"knowledge"`
 	LLM       LLM       `json:"llm"`
+	Update    Update    `json:"update"`
 	Resources Resources `json:"resources"`
 	PidFile   string    `json:"pidfile"`
 	AuditLog  string    `json:"audit_log"`
@@ -75,12 +82,16 @@ func Default() Config {
 		LLM: LLM{
 			Local: LocalLLM{
 				Backend:    "llama.cpp",
+				Bin:        "",
 				PreferGPU:  true,
 				RequireGPU: false,
 			},
 			Remote: RemoteLLM{
 				APIKeyEnv: "HAWKEYE_LLM_API_KEY",
 			},
+		},
+		Update: Update{
+			Dest: "/usr/local/share/hawkeye/knowledge.sqlite",
 		},
 		Resources: Resources{
 			RAMMinFreeBytes:  &ram,
@@ -205,6 +216,29 @@ func ResolvePath(explicit string) string {
 		}
 	}
 	return filepath.Join(SystemDir(), "config.json")
+}
+
+// ApplyEnv overlays operator environment. Model path and backend binary
+// may live in JSON or env (HAWKEYE_LLM_MODEL, HAWKEYE_LLM_BIN). Tokens,
+// if a remote key is ever set, stay in env only.
+func ApplyEnv(c Config, getenv func(string) string) Config {
+	if getenv == nil {
+		return c
+	}
+	if v := strings.TrimSpace(getenv("HAWKEYE_LLM_MODEL")); v != "" {
+		c.LLM.Local.ModelPath = v
+	}
+	if v := strings.TrimSpace(getenv("HAWKEYE_LLM_BIN")); v != "" {
+		c.LLM.Local.Bin = v
+	}
+	if v := strings.TrimSpace(getenv("HAWKEYE_UPDATE_SOURCE")); v != "" {
+		c.Update.Source = v
+	} else if strings.TrimSpace(c.Update.Source) == "" {
+		if v := strings.TrimSpace(getenv("HAWKEYE_DATA_ARTIFACT")); v != "" {
+			c.Update.Source = v
+		}
+	}
+	return c
 }
 
 func Load(path string) (Config, error) {

@@ -21,11 +21,17 @@ func TestSearchPaths_OrderBootThenLocalThenXDG(t *testing.T) {
 	if len(paths) < 3 {
 		t.Fatalf("paths %v", paths)
 	}
-	if paths[0] != "/boot/hawkeye" {
+	if knowledge.RescueDir != "/boot/hawkeye" || knowledge.SystemDir != "/usr/local/share/hawkeye" {
+		t.Fatalf("rescue/system constants: %q %q", knowledge.RescueDir, knowledge.SystemDir)
+	}
+	if paths[0] != knowledge.RescueDir {
 		t.Fatalf("first path must be /boot/hawkeye, got %q", paths[0])
 	}
-	if paths[1] != "/usr/local/share/hawkeye" {
+	if paths[1] != knowledge.SystemDir {
 		t.Fatalf("second path must be system share, got %q", paths[1])
+	}
+	if knowledge.RescueBinary != "/rescue/hawkeye" {
+		t.Fatalf("rescue binary %q", knowledge.RescueBinary)
 	}
 	joined := strings.Join(paths, "|")
 	if !strings.Contains(joined, "/xdg/share/hawkeye") {

@@ -86,6 +86,52 @@ and pulls the corpus in.
 A second
 .Nm pkg
 install of the data port is not required.
+.Pp
+Rescue layout
+.Pq static-capable binary and RO knowledge prefix :
+.Pp
+.Dl make install-rescue
+.Pp
+That stages
+.Pa /rescue/hawkeye
+and creates
+.Pa /boot/hawkeye
+under
+.Ev DESTDIR
+.Pq the build chroot need not have a live
+.Pa /boot
+or
+.Pa /rescue
+.Ns .
+Override
+.Ev RESCUE_DIR
+and
+.Ev BOOT_HAWKEYE
+if those prefixes differ.
+The knowledge sqlite and playbooks come from
+.Nm hawkeye-data
+.Pq dual prefix
+and are not vendored here.
+Set
+.Ev KNOWLEDGE_SRC
+to copy a sqlite file into the rescue kit.
+On a live host,
+.Pa /rescue
+is written only when it is a real directory.
+A dangling bastille
+.Pa /rescue
+symlink
+.Pq thin jail
+is skipped.
+.Pa /boot/hawkeye
+is created when
+.Pa /boot
+exists.
+The port option
+.Cm RESCUE
+is off by default and stages the same paths under
+.Ev DESTDIR
+.Ns .
 .Sh COMMANDS
 .Bl -tag -width indent
 .It Nm
@@ -111,9 +157,15 @@ Default stdout is an operator session: the most actionable playbook for
 the query
 .Pq title, stored summary, stored commands ,
 then related titles.
+When a local model runs, the completion is printed after the playbook
+hits.
 It does not print query or tier keys, ranks, or an
 .Dq llm skipped
-line.
+line
+.Pq no model is a quiet TTY skip;
+.Fl -json
+may still note it
+.Ns .
 .Fl -json
 or
 .Ev HAWKEYE_JSON
@@ -257,7 +309,26 @@ is set.
 Refresh knowledge artifacts from
 .Nm hawkeye-data
 when the root is writable.
-Refused on a read-only root.
+Destination defaults to
+.Pa /usr/local/share/hawkeye/knowledge.sqlite
+.Pq the system knowledge path already in use
+.Ns .
+Source is
+.Fl -src ,
+.Va update.source ,
+or
+.Ev HAWKEYE_UPDATE_SOURCE
+.Pq
+.Ev HAWKEYE_DATA_ARTIFACT
+is a legacy alias
+.Ns .
+If the source is unset, the command skips with status 0 so
+.Xr rc 8
+start stays healthy.
+A set source on a read-only root is still refused
+.Pq first skill is
+.Cm unlock-rw
+.Ns .
 .It Nm init Op Ar dir
 Write a sample JSON configuration
 .Pq mode 0600 .
@@ -362,9 +433,24 @@ rc.d script.
 .It Pa /var/run/hawkeye.pid
 Pidfile
 .Pq mode 0644 ; the PID is not a secret .
+.It Pa /rescue/hawkeye
+Static-capable rescue binary
+.Pq
+.Nm make install-rescue
+or port option
+.Cm RESCUE
+.Ns .
 .It Pa /boot/hawkeye
-Rescue knowledge
-.Pq read-only .
+Rescue knowledge prefix
+.Pq read-only kit; dual prefix with
+.Pa /usr/local/share/hawkeye
+.Ns .
+.It Pa /boot/hawkeye/knowledge.sqlite
+Rescue
+.Pa knowledge.sqlite
+and playbooks from
+.Nm hawkeye-data
+.Pq not vendored in this repository .
 .It Pa /usr/local/share/hawkeye
 System knowledge artifacts from
 .Nm hawkeye-data .

@@ -19,10 +19,11 @@ flowchart TD
     CLI --> Knowledge["knowledge client: SQLite FTS RO"]
     CLI --> PlanApply["plan + apply gate"]
     CLI --> Doctor["doctor + headroom"]
-    CLI --> LLM["llm interface: llama.cpp GPU then CPU"]
+    CLI --> LLM["llm: llama-cli/llama.cpp local GGUF; GPU then CPU"]
     Knowledge -->|"consumes artifacts"| DataRepo["hawkeye-data artifacts"]
     PlanApply -->|"default dry-run; audit"| System["FreeBSD system"]
-    LLM -->|"redact first"| Remote["optional Grok / FreeGrok / Claude"]
+    LLM -->|"redact first"| LocalBin["configured llama-cli; no cloud"]
+    LLM -->|"optional"| Remote["Grok / FreeGrok / Claude via env key"]
 ```
 
 The UI, if any later, is a view only. This skeleton is operator CLI + MCP.

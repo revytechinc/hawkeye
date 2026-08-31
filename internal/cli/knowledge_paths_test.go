@@ -41,3 +41,23 @@ func TestKnowledgePaths_DefaultIncludesCompiled(t *testing.T) {
 		t.Fatalf("unset override must still search compiled paths: %q", got)
 	}
 }
+
+func TestKnowledgePaths_DefaultOrderBootThenShare(t *testing.T) {
+	env := Env{Getenv: func(string) string { return "" }}
+	got := knowledgePaths(env, config.Default())
+	boot, share := -1, -1
+	for i, p := range got {
+		if p == "/boot/hawkeye" && boot < 0 {
+			boot = i
+		}
+		if p == "/usr/local/share/hawkeye" && share < 0 {
+			share = i
+		}
+	}
+	if boot < 0 || share < 0 {
+		t.Fatalf("default search must include /boot/hawkeye and /usr/local/share/hawkeye: %q", got)
+	}
+	if boot > share {
+		t.Fatalf("rescue kit must rank before system share: %q", got)
+	}
+}
