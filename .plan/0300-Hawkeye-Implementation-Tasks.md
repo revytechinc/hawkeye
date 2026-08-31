@@ -25,5 +25,5 @@
 | T016 | --check-config agrees with doctor on missing config | DONE | cursor-check-config-missing-defaults-762f | native install sample-only |
 | T017 | Bare `hawkeye` operator session (panic path) | DONE | cursor/operator-session-repl-688d | TTY REPL like `ollama run`; compose with T015 apply prompt |
 | T018 | plan from lead playbook stored commands | DONE | cursor/plan-from-playbook-c167 | no echo stub; TTY consult apply uses hits |
-| T019 | FreeBSD NetworkCarrier (not Linux sysfs) | IN PROGRESS | cursor/pkg-reviewer-blockers-2150 | ifconfig/ioctl/getifaddrs; Probe can reach tier 2 |
-| T020 | MCP apply uses CLI SysExecutor + auditor | IN PROGRESS | cursor/pkg-reviewer-blockers-2150 | unprivileged+yes must exec; privileged stays dry-run |
+| T019 | FreeBSD NetworkCarrier (not Linux sysfs) | DONE | cursor/pkg-reviewer-blockers-2150 | ifconfig/ioctl/getifaddrs; Probe can reach tier 2 |
+| T020 | MCP apply uses CLI SysExecutor + auditor | DONE | cursor/pkg-reviewer-blockers-2150 | unprivileged+yes must exec; privileged stays dry-run |

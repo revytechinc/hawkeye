@@ -140,3 +140,31 @@ func TestParseIfconfig_IgnoresLinuxSysfsPaths(t *testing.T) {
 		t.Fatal("fixture must be ifconfig(8), not Linux sysfs")
 	}
 }
+
+func TestParseIfconfig_SkipsGarbage(t *testing.T) {
+	text := "not an iface line\n" +
+		"  indented\n" +
+		"nocolon\n" +
+		": empty\n" +
+		".em0: flags=<UP>\n" +
+		"em0;drop: flags=<UP,RUNNING>\n" +
+		"vlan0.1: flags=<UP,RUNNING>\n" +
+		"\tstatus: active\n" +
+		"em_0: flags=<> metric 0\n"
+	ifaces := probe.ParseIfconfig(text)
+	if len(ifaces) != 2 || ifaces[0].Name != "vlan0.1" || ifaces[1].Name != "em_0" {
+		t.Fatalf("%#v", ifaces)
+	}
+	if !probe.CarrierUp(ifaces) {
+		t.Fatal("vlan0.1 status active")
+	}
+}
+
+func TestDefaultHost_IfacesErrorFallsThrough(t *testing.T) {
+	h := probe.DefaultHost{
+		ReadFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+		Glob:     func(string) ([]string, error) { return nil, os.ErrPermission },
+		Ifaces:   func() ([]probe.IfaceStatus, error) { return nil, os.ErrNotExist },
+	}
+	_ = h.NetworkCarrier()
+}
