@@ -116,6 +116,7 @@ func runConsultQuery(env Env, fs flagset, cfg config.Config, q string, in *bufio
 		hr := headroom.Live(snap.GPUPresent)
 		comp = llm.Local{
 			Backend:    cfg.LLM.Local.Backend,
+			Bin:        cfg.LLM.Local.Bin,
 			ModelPath:  cfg.LLM.Local.ModelPath,
 			PreferGPU:  cfg.LLM.Local.PreferGPU,
 			RequireGPU: cfg.LLM.Local.RequireGPU,

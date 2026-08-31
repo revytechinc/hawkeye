@@ -12,15 +12,29 @@ import (
 	"github.com/revytechinc/hawkeye/internal/probe"
 )
 
-const ArtifactName = "knowledge.sqlite"
+const (
+	ArtifactName    = "knowledge.sqlite"
+	DefaultDest     = "/usr/local/share/hawkeye/knowledge.sqlite"
+	SourceEnv       = "HAWKEYE_UPDATE_SOURCE"
+	LegacySourceEnv = "HAWKEYE_DATA_ARTIFACT"
+)
+
+func ResolveDest(dest string) string {
+	if dest == "" {
+		return DefaultDest
+	}
+	return dest
+}
 
 func Run(src, dest string, snap probe.Snapshot) (string, error) {
+	if src == "" {
+		// Unset source is a healthy no-op so rc start does not fail.
+		return "", nil
+	}
 	if snap.RootRO {
 		return "", fmt.Errorf("root is read-only; refuse update (first skill is unlock-rw)")
 	}
-	if src == "" || dest == "" {
-		return "", fmt.Errorf("update source and destination are required")
-	}
+	dest = ResolveDest(dest)
 	in, err := os.Open(src)
 	if err != nil {
 		return "", err

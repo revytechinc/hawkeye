@@ -15,10 +15,10 @@
 | T006 | Doctor human+JSON | DONE | skeleton | |
 | T007 | MCP stdio + HTTP/TLS loopback | DONE | skeleton | |
 | T008 | rc.d + man + ports | DONE | skeleton | |
-| T009 | llama.cpp real backend | OPEN | | interface only |
+| T009 | llama.cpp real backend | IN PROGRESS | cursor/core-llm-update-rescue-d1e7 | llama-cli/llama.cpp exec; env HAWKEYE_LLM_MODEL/BIN |
 | T010 | Real sysctl(8) securelevel | OPEN | | Host overlay |
 | T011 | Streamable HTTP SSE full spec | OPEN | | POST JSON skeleton |
-| T012 | hawkeye-data artifact fetch | OPEN | | `update` copies a file |
+| T012 | hawkeye-data artifact fetch | IN PROGRESS | cursor/core-llm-update-rescue-d1e7 | skip when HAWKEYE_UPDATE_SOURCE unset; dest defaults |
 | T013 | Consult/plan human TTY (JSON behind --json) | DONE | cursor-consult-human-tty-3358 | operator prose default |
 | T014 | Consult TTY: lead actionable playbook + also | DONE | cursor-consult-tty-lead-3358 | omit query/tier/llm skipped |
 | T015 | TTY consult apply/edit prompt | DONE | cursor/consult-apply-prompt-2ee7 | y/N/e after consult; --json/non-TTY silent; --yes still required to land |
@@ -30,3 +30,4 @@
 | T021 | Panic-path apply: shell env, fail≠applied, RO audit, redact-after-parse | DONE | cursor/panic-path-apply-blockers-2072 | ROOTDS persists; step fail exits 1; audit degrades on RO /var; plan JSON parsed then redacted |
 | T022 | Host first-look before session `>` | DONE | cursor/host-first-look-session-b2ff | panic path inspects HOST (fstab/rc/zpool/net/disk); not doctor; compose with T021 |
 | T023 | inspect expands rc.subr `${name}` in command= | IN PROGRESS | cursor/inspect-rc-name-expand-c049 | live jail false-positive sshd missing; isolate plan tests from live kit |
+| T024 | Rescue layout install | IN PROGRESS | cursor/core-llm-update-rescue-d1e7 | make install-rescue; port RESCUE; /rescue + /boot/hawkeye |

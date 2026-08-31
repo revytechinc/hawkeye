@@ -35,7 +35,7 @@ execs as root.
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |
 | `hawkeye doctor` | Service health: config, perms, pidfile, deps, headroom. Human + JSON. Non-zero if unhealthy. |
 | `hawkeye mcp` | MCP server (stdio default; Streamable HTTP on `127.0.0.1`, bearer token required). |
-| `hawkeye update` | Refresh knowledge from hawkeye-data artifacts when writable. |
+| `hawkeye update` | Refresh knowledge from hawkeye-data artifacts when writable. Unset `HAWKEYE_UPDATE_SOURCE` skips (rc start stays healthy). Dest defaults to `/usr/local/share/hawkeye/knowledge.sqlite`. |
 | `hawkeye init` | Write sample JSON config (mode `0600`). |
 | `hawkeye --check-config` | Validate JSON config and exit. Missing file uses compiled defaults (same as doctor). |
 
@@ -73,16 +73,29 @@ make test
 ```
 
 Static /rescue-oriented build: `CGO_ENABLED=0 make build`.
+Stage `/rescue/hawkeye` and the `/boot/hawkeye` prefix (DESTDIR-friendly):
+
+```sh
+make install-rescue
+# or: make install-rescue DESTDIR=/tmp/stage KNOWLEDGE_SRC=/path/from/hawkeye-data/knowledge.sqlite
+```
+
+The port option `RESCUE` installs the same paths. Knowledge sqlite is not
+vendored here; hawkeye-data owns the dual prefix.
 
 Configuration is JSON (RFC 8259) under `/usr/local/etc/cloudbsd/hawkeye/` or
 XDG. Install ships `config.json.sample` (mode `0644`, no secrets). A live
 `config.json` is optional: missing uses compiled defaults, so `hawkeye doctor`
 and `hawkeye --check-config` both succeed after pkg/make install. A present
 file is still validated; invalid JSON fails. Secrets are environment variables
-(`HAWKEYE_LLM_API_KEY`). Knowledge is
+(`HAWKEYE_LLM_API_KEY`). Local inference uses a configured llama.cpp-style
+binary (`HAWKEYE_LLM_BIN` / `llm.local.bin`) and GGUF (`HAWKEYE_LLM_MODEL` /
+`llm.local.model_path`). No model is vendored; no cloud call. GPU if present
+then CPU. Knowledge is
 `knowledge.sqlite` from hawkeye-data (FTS5 tables `documents_fts` and
-`playbooks_fts`, with fallback to legacy `knowledge_fts`). Override the search
-path with `HAWKEYE_KNOWLEDGE_PATH` (directory or sqlite file). See
+`playbooks_fts`, with fallback to legacy `knowledge_fts`). Search order is
+`HAWKEYE_KNOWLEDGE_PATH` (exclusive when set), then `/boot/hawkeye`, then
+`/usr/local/share/hawkeye`, then XDG. See
 `hawkeye.conf(5)`.
 
 ## License

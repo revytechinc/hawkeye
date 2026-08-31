@@ -26,9 +26,26 @@ GO_TARGET=	./cmd/hawkeye
 
 USE_RC_SUBR=	hawkeye
 
+OPTIONS_DEFINE=	RESCUE
+RESCUE_DESC=	Install hawkeye into /rescue and create /boot/hawkeye
+
 PLIST_FILES=	bin/hawkeye \
 		etc/cloudbsd/hawkeye/config.json.sample \
 		share/man/man8/hawkeye.8.gz \
 		share/man/man5/hawkeye.conf.5.gz
+
+.include <bsd.port.options.mk>
+
+.if ${PORT_OPTIONS:MRESCUE}
+PLIST_FILES+=	/rescue/hawkeye
+PLIST_DIRS+=	/boot/hawkeye
+.endif
+
+post-install:
+.if ${PORT_OPTIONS:MRESCUE}
+	${MKDIR} ${STAGEDIR}/rescue
+	${INSTALL_PROGRAM} ${STAGEDIR}${PREFIX}/bin/hawkeye ${STAGEDIR}/rescue/hawkeye
+	${MKDIR} ${STAGEDIR}/boot/hawkeye
+.endif
 
 .include <bsd.port.mk>

@@ -96,3 +96,46 @@ func TestValidate_MCPTokenEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestApplyEnv_LLMAndUpdate(t *testing.T) {
+	c := config.Default()
+	if c.LLM.Local.Bin != "" {
+		t.Fatal("bin must default empty (configured or PATH llama-cli)")
+	}
+	if c.Update.Dest != "/usr/local/share/hawkeye/knowledge.sqlite" {
+		t.Fatalf("update dest default = %q", c.Update.Dest)
+	}
+	if c.Update.Source != "" {
+		t.Fatal("update source must default empty so rc start skips")
+	}
+	got := config.ApplyEnv(c, func(k string) string {
+		switch k {
+		case "HAWKEYE_LLM_MODEL":
+			return "/models/fake.gguf"
+		case "HAWKEYE_LLM_BIN":
+			return "/usr/local/bin/llama-cli"
+		case "HAWKEYE_UPDATE_SOURCE":
+			return "/var/cache/hawkeye-data/knowledge.sqlite"
+		default:
+			return ""
+		}
+	})
+	if got.LLM.Local.ModelPath != "/models/fake.gguf" {
+		t.Fatal(got.LLM.Local.ModelPath)
+	}
+	if got.LLM.Local.Bin != "/usr/local/bin/llama-cli" {
+		t.Fatal(got.LLM.Local.Bin)
+	}
+	if got.Update.Source != "/var/cache/hawkeye-data/knowledge.sqlite" {
+		t.Fatal(got.Update.Source)
+	}
+	legacy := config.ApplyEnv(config.Default(), func(k string) string {
+		if k == "HAWKEYE_DATA_ARTIFACT" {
+			return "/legacy/knowledge.sqlite"
+		}
+		return ""
+	})
+	if legacy.Update.Source != "/legacy/knowledge.sqlite" {
+		t.Fatalf("legacy artifact env: %q", legacy.Update.Source)
+	}
+}

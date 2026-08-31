@@ -10,14 +10,20 @@ import (
 	"github.com/revytechinc/hawkeye/internal/update"
 )
 
-func TestRun_MissingArgs(t *testing.T) {
-	if _, err := update.Run("", "d", probe.Snapshot{}); err == nil {
-		t.Fatal("src")
-	}
+func TestRun_MissingSourceFile(t *testing.T) {
 	if _, err := update.Run("s", "", probe.Snapshot{}); err == nil {
-		t.Fatal("dest")
+		t.Fatal("open of missing src must fail (dest defaults; do not write live ZFS)")
 	}
 	if _, err := update.Run("/no/such/src", "/tmp/x", probe.Snapshot{}); err == nil {
 		t.Fatal("open")
+	}
+}
+
+func TestSourceFromEnvNames(t *testing.T) {
+	if update.SourceEnv != "HAWKEYE_UPDATE_SOURCE" {
+		t.Fatalf("SourceEnv = %q", update.SourceEnv)
+	}
+	if update.LegacySourceEnv != "HAWKEYE_DATA_ARTIFACT" {
+		t.Fatalf("LegacySourceEnv = %q", update.LegacySourceEnv)
 	}
 }

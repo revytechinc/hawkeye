@@ -6,6 +6,8 @@ package llm_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,25 +15,131 @@ import (
 	"github.com/revytechinc/hawkeye/internal/llm"
 )
 
+func ampleRAM() headroom.Snapshot {
+	return headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: false}
+}
+
+func writeFakeLlama(t *testing.T, capture, canned string) string {
+	t.Helper()
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "llama-cli")
+	script := "#!/bin/sh\n"
+	if capture != "" {
+		script += "for a in \"$@\"; do printf '%s\\n' \"$a\" >> \"" + capture + "\"; done\n"
+	}
+	script += "printf '%s\\n' '" + canned + "'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+func TestLocal_NoModelSkips(t *testing.T) {
+	ram := int64(1)
+	l := llm.Local{
+		Backend:  "llama.cpp",
+		Headroom: ampleRAM(),
+		RAMMin:   &ram,
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello", NeedRAM: true})
+	if !errors.Is(err, llm.ErrNoModel) {
+		t.Fatalf("err=%v", err)
+	}
+	if strings.Contains(resp.Text, "skeleton") {
+		t.Fatalf("no-model path must not invent skeleton text: %q", resp.Text)
+	}
+}
+
+func TestLocal_FakeBinaryCapturesPromptAndReturnsCanned(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	canned := "canned local completion: check zpool status"
+	bin := writeFakeLlama(t, capture, canned)
+	ram := int64(1)
+	l := llm.Local{
+		Backend:   "llama.cpp",
+		Bin:       bin,
+		ModelPath: model,
+		PreferGPU: true,
+		Headroom:  ampleRAM(),
+		RAMMin:    &ram,
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{
+		Prompt:  "password=fake-password-for-tests-only zpool degraded",
+		NeedRAM: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Text != canned {
+		t.Fatalf("text=%q want canned", resp.Text)
+	}
+	if strings.Contains(resp.Text, "skeleton") {
+		t.Fatal("must invoke the binary, not the skeleton")
+	}
+	if strings.Contains(resp.Text, "fake-password-for-tests-only") {
+		t.Fatal("secret leaked into LLM response")
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	argv := string(got)
+	if strings.Contains(argv, "fake-password-for-tests-only") {
+		t.Fatal("secret leaked into llama-cli argv")
+	}
+	if !strings.Contains(argv, "-m") || !strings.Contains(argv, model) {
+		t.Fatalf("binary must receive model path: %s", argv)
+	}
+	if !strings.Contains(argv, "-p") {
+		t.Fatalf("binary must receive prompt flag: %s", argv)
+	}
+	if !strings.Contains(argv, "-ngl") {
+		t.Fatalf("GPU-then-CPU must pass -ngl: %s", argv)
+	}
+}
+
 func TestLocal_MissingGPUDoesNotBlockCPUJob(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlama(t, capture, "cpu completion")
 	ram := int64(1)
 	l := llm.Local{
 		Backend:    "llama.cpp",
+		Bin:        bin,
 		PreferGPU:  true,
 		RequireGPU: false,
 		GPUPresent: false,
-		ModelPath:  "/nonexistent/model.gguf",
-		Headroom:   headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: false},
+		ModelPath:  model,
+		Headroom:   ampleRAM(),
 		RAMMin:     &ram,
 	}
-	_, err := l.Complete(context.Background(), llm.Request{Prompt: "hello", NeedGPU: false, NeedRAM: true})
-	if err != nil && !errors.Is(err, llm.ErrNoModel) {
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello", NeedGPU: false, NeedRAM: true})
+	if err != nil {
 		t.Fatalf("CPU job blocked: %v", err)
+	}
+	if resp.UsedGPU {
+		t.Fatal("missing GPU must not mark UsedGPU")
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "-ngl") || !strings.Contains(string(got), "\n0\n") {
+		t.Fatalf("CPU fallback must pass -ngl 0: %s", got)
 	}
 }
 
 func TestLocal_RequireGPUFailsWithoutDevice(t *testing.T) {
-	l := llm.Local{RequireGPU: true, GPUPresent: false, Headroom: headroom.Snapshot{RAMFreeBytes: 1 << 30}}
+	l := llm.Local{RequireGPU: true, GPUPresent: false, Headroom: ampleRAM(), ModelPath: "/models/fake.gguf"}
 	_, err := l.Complete(context.Background(), llm.Request{NeedGPU: true})
 	if !errors.Is(err, llm.ErrGPURequired) {
 		t.Fatalf("err=%v", err)
@@ -39,10 +147,18 @@ func TestLocal_RequireGPUFailsWithoutDevice(t *testing.T) {
 }
 
 func TestLocal_RedactsPrompt(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlama(t, capture, "ok")
 	l := llm.Local{
 		Backend:   "llama.cpp",
-		ModelPath: "/models/fake.gguf",
-		Headroom:  headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Bin:       bin,
+		ModelPath: model,
+		Headroom:  ampleRAM(),
 	}
 	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "password=fake-password-for-tests-only"})
 	if err != nil {
@@ -50,5 +166,75 @@ func TestLocal_RedactsPrompt(t *testing.T) {
 	}
 	if strings.Contains(resp.Text, "fake-password-for-tests-only") {
 		t.Fatal("secret leaked into LLM response path")
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(got), "fake-password-for-tests-only") {
+		t.Fatal("secret leaked into backend argv")
+	}
+}
+
+func TestLocal_PreferGPUPassesLayersWhenPresent(t *testing.T) {
+	dir := t.TempDir()
+	capture := filepath.Join(dir, "argv.txt")
+	model := filepath.Join(dir, "fake.gguf")
+	if err := os.WriteFile(model, []byte("not-a-real-gguf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := writeFakeLlama(t, capture, "gpu completion")
+	l := llm.Local{
+		Backend:    "llama.cpp",
+		Bin:        bin,
+		ModelPath:  model,
+		PreferGPU:  true,
+		GPUPresent: true,
+		Headroom:   headroom.Snapshot{RAMFreeBytes: 1 << 30, GPUPresent: true},
+	}
+	resp, err := l.Complete(context.Background(), llm.Request{Prompt: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.UsedGPU {
+		t.Fatal("GPU present and preferred must set UsedGPU")
+	}
+	got, err := os.ReadFile(capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "99") {
+		t.Fatalf("GPU path must pass -ngl 99: %s", got)
+	}
+}
+
+func TestLocal_NoBinary(t *testing.T) {
+	l := llm.Local{
+		Backend:   "llama.cpp",
+		ModelPath: "/models/fake.gguf",
+		Headroom:  ampleRAM(),
+	}
+	t.Setenv("PATH", t.TempDir())
+	_, err := l.Complete(context.Background(), llm.Request{Prompt: "hello"})
+	if !errors.Is(err, llm.ErrNoBinary) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestLocal_HeadroomRefuse(t *testing.T) {
+	ram := int64(1 << 40)
+	l := llm.Local{
+		Backend:   "llama.cpp",
+		Bin:       "/nonexistent/llama-cli",
+		ModelPath: "/models/fake.gguf",
+		Headroom:  headroom.Snapshot{RAMFreeBytes: 1},
+		RAMMin:    &ram,
+	}
+	_, err := l.Complete(context.Background(), llm.Request{Prompt: "hello", NeedRAM: true})
+	if err == nil {
+		t.Fatal("expected headroom refusal before exec")
+	}
+	if errors.Is(err, llm.ErrNoModel) || errors.Is(err, llm.ErrGPURequired) {
+		t.Fatalf("wrong error: %v", err)
 	}
 }

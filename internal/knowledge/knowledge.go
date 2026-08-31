@@ -25,7 +25,12 @@ var (
 	absPath = filepath.Abs
 )
 
-const DBName = "knowledge.sqlite"
+const (
+	DBName       = "knowledge.sqlite"
+	RescueDir    = "/boot/hawkeye"
+	SystemDir    = "/usr/local/share/hawkeye"
+	RescueBinary = "/rescue/hawkeye"
+)
 
 type Store struct {
 	Path      string
@@ -48,7 +53,7 @@ type Hit struct {
 }
 
 func SearchPaths(xdgDataHome, home string) []string {
-	out := []string{"/boot/hawkeye", "/usr/local/share/hawkeye"}
+	out := []string{RescueDir, SystemDir}
 	if xdgDataHome != "" {
 		out = append(out, filepath.Join(xdgDataHome, "hawkeye"))
 	} else if home != "" {

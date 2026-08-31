@@ -105,6 +105,7 @@ func RunEnv(env Env) int {
 			}
 		}
 	}
+	cfg = config.ApplyEnv(cfg, env.Getenv)
 
 	switch fs.cmd {
 	case "":
@@ -557,23 +558,22 @@ func cmdUpdate(env Env, fs flagset, cfg config.Config) int {
 	snap := probe.Probe(env.Host)
 	src := fs.src
 	if src == "" {
-		src = env.Getenv("HAWKEYE_DATA_ARTIFACT")
+		src = cfg.Update.Source
 	}
 	dest := fs.dest
 	if dest == "" {
-		if len(cfg.Knowledge.Paths) > 1 {
-			dest = filepath.Join(cfg.Knowledge.Paths[1], knowledge.DBName)
-		} else if len(cfg.Knowledge.Paths) == 1 {
-			dest = filepath.Join(cfg.Knowledge.Paths[0], knowledge.DBName)
-		} else {
-			dest = filepath.Join("/usr/local/share/hawkeye", knowledge.DBName)
-		}
+		dest = cfg.Update.Dest
+	}
+	if dest == "" {
+		dest = update.DefaultDest
 	}
 	got, err := update.Run(src, dest, snap)
 	if err != nil {
 		fmt.Fprintln(env.Stderr, err)
 		return 1
 	}
-	fmt.Fprintln(env.Stdout, got)
+	if got != "" {
+		fmt.Fprintln(env.Stdout, got)
+	}
 	return 0
 }
