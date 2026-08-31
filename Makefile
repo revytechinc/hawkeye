@@ -12,7 +12,7 @@ BIN = hawkeye
 all: build
 
 build:
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) build -trimpath -ldflags "-s -w" -o $(BIN) ./cmd/hawkeye
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build -buildvcs=false -trimpath -ldflags "-s -w" -o $(BIN) ./cmd/hawkeye
 
 test:
 	$(GO) test ./internal/... ./cmd/hawkeye -count=1

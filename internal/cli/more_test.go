@@ -121,6 +121,9 @@ func TestRunWrapper(t *testing.T) {
 }
 
 func TestDoctorUnreadablePidfile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("chmod 0000 is still readable as root")
+	}
 	dir := t.TempDir()
 	pidp := filepath.Join(dir, "hawkeye.pid")
 	if err := os.WriteFile(pidp, []byte("12345\n"), 0o600); err != nil {
