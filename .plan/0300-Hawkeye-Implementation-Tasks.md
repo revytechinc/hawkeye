@@ -19,3 +19,4 @@
 | T010 | Real sysctl(8) securelevel | OPEN | | Host overlay |
 | T011 | Streamable HTTP SSE full spec | OPEN | | POST JSON skeleton |
 | T012 | hawkeye-data artifact fetch | OPEN | | `update` copies a file |
+| T013 | Consult/plan human TTY (JSON behind --json) | DONE | cursor-consult-human-tty-3358 | operator prose default |

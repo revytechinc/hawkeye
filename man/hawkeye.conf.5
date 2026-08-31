@@ -1,4 +1,4 @@
-.Dd August 30, 2026
+.Dd August 31, 2026
 .Dt HAWKEYE.CONF 5
 .Os CloudBSD
 .Sh NAME
@@ -123,6 +123,18 @@ file containing the token
 Used when
 .Ev HAWKEYE_MCP_TOKEN
 is unset.
+.It Ev HAWKEYE_JSON
+When set to
+.Li 1 ,
+.Li true ,
+or
+.Li yes ,
+.Nm hawkeye Cm consult
+and
+.Nm hawkeye Cm plan
+emit JSON on stdout the same as
+.Fl -json .
+Unset means the operator session.
 .It Ev HAWKEYE_KNOWLEDGE_PATH
 Extra knowledge directory for tests and rescue overlays.
 .It Ev HAWKEYE_DATA_ARTIFACT

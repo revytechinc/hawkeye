@@ -39,10 +39,10 @@ type Store struct {
 }
 
 type Hit struct {
-	Title string
-	Body  string
-	Tags  string
-	Rank  float64
+	Title string  `json:"title"`
+	Body  string  `json:"body"`
+	Tags  string  `json:"tags,omitempty"`
+	Rank  float64 `json:"rank,omitempty"`
 }
 
 func SearchPaths(xdgDataHome, home string) []string {

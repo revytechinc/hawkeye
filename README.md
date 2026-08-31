@@ -28,8 +28,8 @@ execs as root.
 
 | Command | What it does |
 |---------|----------------|
-| `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. No writes. |
-| `hawkeye plan` | JSON plan. No mutation. |
+| `hawkeye consult` | Diagnose using knowledge FTS + optional LLM. No writes. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the machine object. |
+| `hawkeye plan` | Propose steps. No mutation. Operator session on stdout; `--json` / `HAWKEYE_JSON=1` for the JSON plan. |
 | `hawkeye apply [--dry-run\|--yes]` | Mutate. **Default is dry-run.** LLM never execs as root. Audited. |
 | `hawkeye doctor` | Service health: config, perms, pidfile, deps, headroom. Human + JSON. Non-zero if unhealthy. |
 | `hawkeye mcp` | MCP server (stdio default; Streamable HTTP on `127.0.0.1`, bearer token required). |
