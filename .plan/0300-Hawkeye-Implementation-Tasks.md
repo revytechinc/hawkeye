@@ -17,7 +17,7 @@
 | T008 | rc.d + man + ports | DONE | skeleton | |
 | T009 | llama.cpp real backend | DONE | cursor/core-llm-update-rescue-d1e7 | llama-cli/llama.cpp exec; env HAWKEYE_LLM_MODEL/BIN |
 | T010 | Real sysctl(8) securelevel | OPEN | | Host overlay |
-| T011 | Streamable HTTP SSE full spec | OPEN | | POST JSON skeleton |
+| T011 | Streamable HTTP SSE full spec | DONE | cursor/mcp-post-sse-c167 | POST Accept event-stream → SSE message |
 | T012 | hawkeye-data artifact fetch | DONE | cursor/core-llm-update-rescue-d1e7 | skip when HAWKEYE_UPDATE_SOURCE unset; dest defaults |
 | T013 | Consult/plan human TTY (JSON behind --json) | DONE | cursor-consult-human-tty-3358 | operator prose default |
 | T014 | Consult TTY: lead actionable playbook + also | DONE | cursor-consult-tty-lead-3358 | omit query/tier/llm skipped |

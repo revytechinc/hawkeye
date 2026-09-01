@@ -225,9 +225,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		resp := s.Handle(req)
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("MCP-Protocol-Version", "2025-03-26")
-		_ = json.NewEncoder(w).Encode(resp)
+		writeRPC(w, r, resp)
 	case http.MethodGet, http.MethodHead:
 		// Streamable HTTP GET after auth opens an SSE stream (spec 2025-03-26).
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -245,6 +243,42 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// WantsSSE reports whether Accept includes text/event-stream
+// (MCP Streamable HTTP 2025-03-26). JSON-only Accept stays JSON.
+func WantsSSE(accept string) bool {
+	for _, part := range strings.Split(accept, ",") {
+		media := strings.TrimSpace(part)
+		if i := strings.IndexByte(media, ';'); i >= 0 {
+			media = strings.TrimSpace(media[:i])
+		}
+		if strings.EqualFold(media, "text/event-stream") {
+			return true
+		}
+	}
+	return false
+}
+
+func writeRPC(w http.ResponseWriter, r *http.Request, resp Response) {
+	w.Header().Set("MCP-Protocol-Version", "2025-03-26")
+	if WantsSSE(r.Header.Get("Accept")) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache, no-store")
+		w.Header().Set("Connection", "keep-alive")
+		w.WriteHeader(http.StatusOK)
+		b, err := json.Marshal(resp)
+		if err != nil {
+			return
+		}
+		_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", b)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func ListenAndServe(addr, certFile, keyFile, token string, s *Server) error {
