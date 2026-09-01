@@ -132,6 +132,13 @@ func Run(d Deps) Report {
 	}
 	r.Checks = append(r.Checks, Check{Name: "local_llm", OK: true, Detail: modelDetail})
 
+	slOK := true
+	slDetail := "kern.securelevel unknown (sysctl(8) not available)"
+	if d.Probe.SecurelevelOK {
+		slDetail = fmt.Sprintf("kern.securelevel=%d (sysctl(8))", d.Probe.Securelevel)
+	}
+	r.Checks = append(r.Checks, Check{Name: "securelevel", OK: slOK, Detail: slDetail})
+
 	r.Healthy = true
 	for _, c := range r.Checks {
 		if !c.OK {

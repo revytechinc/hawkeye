@@ -310,8 +310,18 @@ If the audit log directory cannot be created
 .Ns ,
 apply still lands and notes the skip on stderr.
 .It Nm doctor
-Service health: configuration, permissions, pidfile, dependencies, and
-resource headroom.
+Service health: configuration, permissions, pidfile, dependencies,
+resource headroom, and
+.Va kern.securelevel
+from
+.Xr sysctl 8
+.Pq
+.Pa /sbin/sysctl ,
+.Pa /usr/sbin/sysctl ,
+or
+.Pa /rescue/sysctl
+.Ns .
+An unknown securelevel is a note, not a failure.
 Prints human-readable evidence and JSON.
 Exits non-zero if unhealthy.
 .It Nm mcp Op Fl -stdio | Fl -http
@@ -331,7 +341,22 @@ nginx terminates TLS and reverse-proxies
 to the loopback listener.
 Public URL:
 .Lk https://hawkeye.revytechinc.com/mcp .
-GET is Server-Sent Events after authentication; POST is JSON-RPC.
+GET is Server-Sent Events after authentication.
+POST is JSON-RPC
+.Pq
+.Li application/json
+.Ns .
+When
+.Va Accept
+includes
+.Li text/event-stream
+.Pq MCP Streamable HTTP 2025-03-26
+the POST response is an SSE
+.Li event: message
+frame carrying the same JSON-RPC object.
+JSON-only
+.Va Accept
+stays JSON.
 Missing or wrong token returns HTTP 401.
 The token is never written to logs or documentation.
 MCP tools use the same plan/apply gate as the operator CLI:
