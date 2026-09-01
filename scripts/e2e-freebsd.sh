@@ -1,5 +1,6 @@
 #!/bin/sh
 # Hawkeye FreeBSD end-to-end smoke (run ON FreeBSD as root or with doas).
+# Target platform: FreeBSD 16.0-CURRENT (product lab jail).
 # Usage: sh scripts/e2e-freebsd.sh [/path/to/hawkeye-bin]
 set -eu
 

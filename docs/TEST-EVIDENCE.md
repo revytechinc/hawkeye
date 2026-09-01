@@ -1377,14 +1377,22 @@ total              ~89.5%+
 Plan `.plan/0300-Hawkeye-Implementation-Tasks.md`: T010 and T011 DONE.
 No secrets in fixtures. Apply dry-run default unchanged.
 
-## 36. Full FreeBSD e2e (QEMU TCG + OVMF) (2026-09-01)
+## 36. Full FreeBSD e2e — 16.0-CURRENT (2026-09-01)
+
+**Target:** FreeBSD **16.0-CURRENT** (matches product jail
+`hawkeye.revytechinc.com`, see §27). An initial 14.3-RELEASE QEMU run was
+wrong for the lab; kept as `hawkeye-e2e-14.3.log` for reference only.
 
 **Preferred on FreeBSD hosts:** `scripts/e2e-freebsd-vm-bhyve.sh` (vm-bhyve +
-bhyve, bridged SSH). The QEMU run below was a Linux cloud-agent fallback.
+bhyve, bridged SSH). Linux cloud agents use QEMU as fallback.
 
-Guest: FreeBSD 14.3-RELEASE amd64 cloud image under QEMU.
-Host agent is Linux; `/dev/kvm` hits `kvm_spurious_fault`, so accel=tcg.
-UEFI (OVMF) required (image has EFI ESP). Cross-build:
+Guest (authoritative): **FreeBSD 16.0-CURRENT** amd64 snapshot cloud image:
+
+```
+https://download.freebsd.org/ftp/snapshots/VM-IMAGES/16.0-CURRENT/amd64/Latest/FreeBSD-16.0-CURRENT-amd64-BASIC-CLOUDINIT-ufs.qcow2.xz
+```
+
+Cross-build:
 
 ```
 CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -o hawkeye ./cmd/hawkeye
@@ -1392,11 +1400,11 @@ CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -o hawkeye ./cmd/hawkeye
 
 Runners:
 - `scripts/e2e-freebsd-vm-bhyve.sh` — **FreeBSD + vm-bhyve** (lab default)
-- `scripts/e2e-freebsd-qemu.sh` — Linux/QEMU fallback
+- `scripts/e2e-freebsd-qemu.sh` — Linux/QEMU fallback (defaults to 16.0-CURRENT URL)
 - `scripts/e2e-freebsd.sh` — guest-side smoke (both paths)
 
-Result (QEMU fallback): **fail=0** (exit 0). Artifacts:
-`docs/evidence/freebsd-e2e-2026-09-01/`.
+Result (16.0-CURRENT, QEMU TCG `-cpu qemu64`): **fail=0** (exit 0).
+Artifacts: `docs/evidence/freebsd-e2e-2026-09-01/`.
 
 ```
 PASS: help
@@ -1409,31 +1417,27 @@ PASS: consult json exit=0
 PASS: plan json exit=0
 PASS: apply default (no --yes) exit=0
 PASS: apply --dry-run
-NOTE: securelevel string not found in log (check probe JSON manually)
-PASS: mcp --stdio initialize (exit=0)
 PASS: sysctl(8) kern.securelevel=-1
+PASS: mcp --stdio initialize (exit=0)
 === summary fail=0 ===
 ```
 
 Notes:
 - `doctor` UNHEALTHY without hawkeye-data kit (dependencies FAIL) — expected.
 - Apply stayed dry-run (no `--yes`); JSON showed `"dry_run": true`.
-- `sshd` segfaults under this TCG guest; e2e used serial console + FAT share.
-- Lab jail `hawkeye.revytechinc.com` was unreachable (no SSH key in agent);
-  re-run with vm-bhyve there once SSH is wired.
-- `securelevel` is not yet serialized in doctor/inspect JSON; e2e asserts
-  via `sysctl(8) kern.securelevel` (T010 input path). Script now logs that
-  sysctl line so the NOTE becomes a PASS on the next run.
+- Under QEMU TCG, use `E2E_CPU=qemu64`; `-cpu max` can panic ZFS AVX2 on 16-CURRENT.
+- Lab jail was unreachable (no SSH key); vm-bhyve on host is still the gold path.
+- `securelevel` asserted via `sysctl(8) kern.securelevel=-1` (T010 input path).
 
 ### vm-bhyve (lab — not run from this Linux agent)
 
-On `hawkeye.revytechinc.com` or any FreeBSD host with vm-bhyve:
+On `hawkeye.revytechinc.com` or any FreeBSD 16 host with vm-bhyve:
 
 ```sh
 pkg install vm-bhyve bhyve-firmware uefi-edk2-bhyve go
 sysrc vm_enable=YES vm_dir="zfs:zroot/vm"
 vm init && vm switch create public && vm switch add public em0
-vm img https://download.freebsd.org/ftp/releases/VM-IMAGES/14.3-RELEASE/amd64/Latest/FreeBSD-14.3-RELEASE-amd64-ufs.qcow2.xz
+vm img https://download.freebsd.org/ftp/snapshots/VM-IMAGES/16.0-CURRENT/amd64/Latest/FreeBSD-16.0-CURRENT-amd64-BASIC-CLOUDINIT-ufs.qcow2.xz
 E2E_SSH_PUB=~/.ssh/id_ed25519.pub sh scripts/e2e-freebsd-vm-bhyve.sh --provision
 sh scripts/e2e-freebsd-vm-bhyve.sh
 ```
