@@ -18,6 +18,9 @@ type DefaultHost struct {
 	Glob       func(string) ([]string, error)
 	MountTable func() (string, error) // mount -p / getfsstat text; tests inject this
 	Sysctl     func(string) (int, bool)
+	// Sysctl8 is the sysctl(8) overlay (stdout of `sysctl -n <mib>`).
+	// Used when Sysctl is nil or the kernel sysctl call is unknown.
+	Sysctl8 func(string) (string, error)
 	// Ifaces injects a FreeBSD getifaddrs/ifconfig view. Tests use this
 	// instead of faking Linux /sys/class/net/*/carrier.
 	Ifaces func() ([]IfaceStatus, error)
@@ -47,6 +50,15 @@ func (h DefaultHost) read(path string) string {
 func (h DefaultHost) SysctlInt(name string) (int, bool) {
 	if h.Sysctl != nil {
 		return h.Sysctl(name)
+	}
+	// Injected sysctl(8) overlay (tests). Live() uses Sysctl: liveSysctlInt,
+	// which already falls back to /sbin/sysctl then /rescue/sysctl.
+	if h.Sysctl8 != nil {
+		out, err := h.Sysctl8(name)
+		if err != nil {
+			return 0, false
+		}
+		return ParseSysctlN(out)
 	}
 	return liveSysctlInt(name)
 }

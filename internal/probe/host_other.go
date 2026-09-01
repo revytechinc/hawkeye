@@ -7,7 +7,10 @@ package probe
 
 import "net"
 
-func liveSysctlInt(string) (int, bool) { return 0, false }
+func liveSysctlInt(name string) (int, bool) {
+	// Not FreeBSD: no unix.Sysctl for kern.securelevel. Still try sysctl(8).
+	return liveSysctl8Int(name)
+}
 
 func liveMountTable() (string, error) { return "", nil }
 

@@ -1341,3 +1341,97 @@ SIGNALS FILES SEE ALSO; llama-embedding query-time rank).
 `hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO;
 `llm.local.bin` is the completer only. No hawkeye-www. No GGUF vendored.
 Consult stays read-only. LLM never execs as root.
+
+## 30. sysctl(8) kern.securelevel host overlay (2026-09-01)
+
+T010. Doctor now always reports a `securelevel` check. Known values
+come from `unix.SysctlUint32` on FreeBSD, then `sysctl(8) -n`
+(`/sbin/sysctl`, `/usr/sbin/sysctl`, `/rescue/sysctl`). Unknown is a
+note, not a failure. MIB names are restricted to letters, digits, `.`,
+and `_`. Verbose `sysctl` output without `-n` is rejected.
+
+Red (before overlay + doctor check):
+
+```
+--- FAIL: TestSysctl8Int_UsesInjectedRunner
+    undefined: probe.Sysctl8Int
+--- FAIL: TestRun_SecurelevelKnownIsNoteNotFail
+    missing securelevel check
+--- FAIL: TestRun_SecurelevelUnknownIsNoteNotFail
+    missing securelevel check
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ParseSysctlN           90.0%
+safeMIB                85.7%
+Sysctl8Int             88.9%
+liveSysctl8Int         100.0%
+doctor.Run             95.9%
+doctor.JSON            100.0%
+doctor.Human           100.0%
+redact                 100.0%
+total                  89.4%
+```
+
+`--check-config` (no file): exit 0, defaults.
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json doctor` (Linux host, no kit): UNHEALTHY, knowledge
+missing, `local_llm` ok optional GGUF missing, GPU absent ok,
+`securelevel` ok `kern.securelevel unknown (sysctl(8) not available)`.
+Exit 1. High or unknown securelevel must not fail doctor.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`scripts/e2e-freebsd16.sh` exits 2 on non-FreeBSD (Linux CI skip).
+Live FreeBSD 16 product-jail e2e is recorded when the script is run
+on that host (no `--yes`).
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO; doctor `kern.securelevel` via `sysctl(8)`).
+`hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO.
+No hawkeye-www. No GGUF vendored. LLM never execs as root.
+
+## 31. FreeBSD 16.0-CURRENT e2e (2026-09-01)
+
+Live guest: QEMU TCG, official
+`FreeBSD-16.0-CURRENT-amd64-BASIC-CLOUDINIT-ufs` snapshot (2026-08-31),
+hostname `hawkeye-e2e`. Nested KVM on this host hits
+`kvm_spurious_fault`; TCG boots. `freebsd-version` = `16.0-CURRENT`.
+`sysctl -n kern.securelevel` = `-1`.
+
+First doctor read used `unix.SysctlUint32` and reported
+`kern.securelevel=4294967295`. Red: `TestSignedSysctl32_SecurelevelMinusOne`.
+Fix: prefer `sysctl(8) -n`, interpret 32-bit kernel values as int32.
+
+`scripts/e2e-freebsd16.sh` with
+`HAWKEYE=/root/e2e/hawkeye` and
+`HAWKEYE_KNOWLEDGE_PATH=/root/e2e/knowledge.sqlite`
+(CreatePlaybookTestDB remount playbook). No `--yes`.
+
+```
+e2e: FreeBSD 16.0-CURRENT host=hawkeye-e2e
+e2e: --check-config ok
+"detail": "kern.securelevel=-1 (sysctl(8))"
+e2e: doctor reports securelevel
+e2e: consult --json ok
+e2e: plan --json ok
+e2e: apply --dry-run ok
+CT=text/event-stream
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{...}}
+UNAUTH_CODE=401 CT=application/json
+MCP_SSE_OK
+e2e: MCP POST SSE ok
+e2e: PASS
+```
+
+Plan steps are stored remount commands (`export PATH=/rescue:...`,
+`mount -p`, `zfs set readonly=off "$ROOTDS"`, `mount -u -o rw /`),
+not `echo <query>`. Apply JSON has dry-run true. MCP POST with
+`Accept: application/json, text/event-stream` is SSE `event: message`.
+401 is JSON. FAKE bearer token only. Doctor healthy with the fixture
+kit. GPU absent is ok. No hawkeye-www. LLM never execs as root.
