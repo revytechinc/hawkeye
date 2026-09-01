@@ -26,10 +26,11 @@ func cstring(b []byte) string {
 
 func liveSysctlInt(name string) (int, bool) {
 	v, err := unix.SysctlUint32(name)
-	if err != nil {
-		return 0, false
+	if err == nil {
+		return int(v), true
 	}
-	return int(v), true
+	// Jail/rescue: libc sysctl can fail; sysctl(8) in /sbin or /rescue is the overlay.
+	return liveSysctl8Int(name)
 }
 
 func liveMountTable() (string, error) {

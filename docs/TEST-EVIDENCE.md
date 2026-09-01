@@ -1341,3 +1341,56 @@ SIGNALS FILES SEE ALSO; llama-embedding query-time rank).
 `hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO;
 `llm.local.bin` is the completer only. No hawkeye-www. No GGUF vendored.
 Consult stays read-only. LLM never execs as root.
+
+## 30. sysctl(8) kern.securelevel host overlay (2026-09-01)
+
+T010. Doctor now always reports a `securelevel` check. Known values
+come from `unix.SysctlUint32` on FreeBSD, then `sysctl(8) -n`
+(`/sbin/sysctl`, `/usr/sbin/sysctl`, `/rescue/sysctl`). Unknown is a
+note, not a failure. MIB names are restricted to letters, digits, `.`,
+and `_`. Verbose `sysctl` output without `-n` is rejected.
+
+Red (before overlay + doctor check):
+
+```
+--- FAIL: TestSysctl8Int_UsesInjectedRunner
+    undefined: probe.Sysctl8Int
+--- FAIL: TestRun_SecurelevelKnownIsNoteNotFail
+    missing securelevel check
+--- FAIL: TestRun_SecurelevelUnknownIsNoteNotFail
+    missing securelevel check
+```
+
+Green: `CGO_ENABLED=0 go test ./internal/... ./cmd/hawkeye -count=1 -coverprofile=coverage.out` PASS.
+
+```
+ParseSysctlN           90.0%
+safeMIB                85.7%
+Sysctl8Int             88.9%
+liveSysctl8Int         100.0%
+doctor.Run             95.9%
+doctor.JSON            100.0%
+doctor.Human           100.0%
+redact                 100.0%
+total                  89.4%
+```
+
+`--check-config` (no file): exit 0, defaults.
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye --json doctor` (Linux host, no kit): UNHEALTHY, knowledge
+missing, `local_llm` ok optional GGUF missing, GPU absent ok,
+`securelevel` ok `kern.securelevel unknown (sysctl(8) not available)`.
+Exit 1. High or unknown securelevel must not fail doctor.
+
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build` succeeded.
+
+`scripts/e2e-freebsd16.sh` exits 2 on non-FreeBSD (Linux CI skip).
+Live FreeBSD 16 product-jail e2e is recorded when the script is run
+on that host (no `--yes`).
+
+`mandoc` not installed here. Equivalent mdoc lint: required macros
+present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
+SIGNALS FILES SEE ALSO; doctor `kern.securelevel` via `sysctl(8)`).
+`hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO.
+No hawkeye-www. No GGUF vendored. LLM never execs as root.

@@ -76,6 +76,59 @@ func TestRun_MissingOptionalGGUFIsNoteNotFail(t *testing.T) {
 	}
 }
 
+func TestRun_SecurelevelKnownIsNoteNotFail(t *testing.T) {
+	r := doctor.Run(doctor.Deps{
+		Cfg:         config.Default(),
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 1, Securelevel: 1, SecurelevelOK: true},
+	})
+	if !r.Healthy {
+		t.Fatalf("known securelevel must not fail doctor: %+v", r)
+	}
+	found := false
+	for _, c := range r.Checks {
+		if c.Name != "securelevel" {
+			continue
+		}
+		found = true
+		if !c.OK || !strings.Contains(c.Detail, "kern.securelevel=1") {
+			t.Fatalf("%+v", c)
+		}
+	}
+	if !found {
+		t.Fatal("doctor must report sysctl(8) securelevel")
+	}
+	if !strings.Contains(r.Human(), "securelevel") {
+		t.Fatalf("human missing securelevel:\n%s", r.Human())
+	}
+}
+
+func TestRun_SecurelevelUnknownIsNoteNotFail(t *testing.T) {
+	r := doctor.Run(doctor.Deps{
+		Cfg:         config.Default(),
+		KnowledgeOK: true,
+		Headroom:    headroom.Snapshot{RAMFreeBytes: 1 << 30},
+		Probe:       probe.Snapshot{Tier: 2},
+	})
+	if !r.Healthy {
+		t.Fatalf("unknown securelevel must not fail doctor: %+v", r)
+	}
+	found := false
+	for _, c := range r.Checks {
+		if c.Name != "securelevel" {
+			continue
+		}
+		found = true
+		if !c.OK || !strings.Contains(c.Detail, "unknown") {
+			t.Fatalf("%+v", c)
+		}
+	}
+	if !found {
+		t.Fatal("missing securelevel check")
+	}
+}
+
 func TestRun_PresentOptionalGGUFIsStillHealthy(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "tiny.gguf")
@@ -142,7 +195,7 @@ func TestRun_ReportsAllResourcesEvenUnused(t *testing.T) {
 	for _, c := range r.Checks {
 		names[c.Name] = true
 	}
-	for _, want := range []string{"config", "permissions", "pidfile", "dependencies", "headroom", "local_llm"} {
+	for _, want := range []string{"config", "permissions", "pidfile", "dependencies", "headroom", "local_llm", "securelevel"} {
 		if !names[want] {
 			t.Fatalf("missing check %s in %#v", want, names)
 		}

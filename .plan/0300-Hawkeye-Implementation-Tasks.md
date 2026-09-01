@@ -16,7 +16,7 @@
 | T007 | MCP stdio + HTTP/TLS loopback | DONE | skeleton | |
 | T008 | rc.d + man + ports | DONE | skeleton | |
 | T009 | llama.cpp real backend | DONE | cursor/core-llm-update-rescue-d1e7 | llama-cli/llama.cpp exec; env HAWKEYE_LLM_MODEL/BIN |
-| T010 | Real sysctl(8) securelevel | OPEN | | Host overlay |
+| T010 | Real sysctl(8) securelevel | DONE | cursor/sysctl8-securelevel-c167 | Host overlay; doctor reports kern.securelevel |
 | T011 | Streamable HTTP SSE full spec | OPEN | | POST JSON skeleton |
 | T012 | hawkeye-data artifact fetch | DONE | cursor/core-llm-update-rescue-d1e7 | skip when HAWKEYE_UPDATE_SOURCE unset; dest defaults |
 | T013 | Consult/plan human TTY (JSON behind --json) | DONE | cursor-consult-human-tty-3358 | operator prose default |

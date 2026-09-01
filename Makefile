@@ -14,7 +14,7 @@ BOOT_HAWKEYE ?= /boot/hawkeye
 # Optional knowledge.sqlite from hawkeye-data. Do not vendor a corpus here.
 KNOWLEDGE_SRC ?=
 
-.PHONY: all build test cover install install-rescue clean man
+.PHONY: all build test cover install install-rescue clean man e2e-freebsd
 
 all: build
 
@@ -123,6 +123,11 @@ man:
 	else \
 		echo "mandoc not installed; equivalent lint skipped at runtime (see docs/TEST-EVIDENCE.md)"; \
 	fi
+
+# Product e2e on FreeBSD 14.5 / 15.1 / 16. Exits 2 on non-FreeBSD.
+# Dry-run only (no --yes). Override HAWKEYE= and QUERY=.
+e2e-freebsd:
+	@sh scripts/e2e-freebsd16.sh
 
 clean:
 	rm -f $(BIN) coverage.out coverage.html
