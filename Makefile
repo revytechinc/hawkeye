@@ -14,7 +14,7 @@ BOOT_HAWKEYE ?= /boot/hawkeye
 # Optional knowledge.sqlite from hawkeye-data. Do not vendor a corpus here.
 KNOWLEDGE_SRC ?=
 
-.PHONY: all build test cover install install-rescue clean man e2e-freebsd
+.PHONY: all build test cover install install-rescue clean man e2e-freebsd mcpcheck
 
 all: build
 
@@ -126,8 +126,12 @@ man:
 
 # Product e2e on FreeBSD 14.5 / 15.1 / 16. Exits 2 on non-FreeBSD.
 # Dry-run only (no --yes). Override HAWKEYE= and QUERY=.
+# Stock CURRENT images lack python3; build mcpcheck next to hawkeye.
 e2e-freebsd:
 	@sh scripts/e2e-freebsd16.sh
+
+mcpcheck:
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) build -buildvcs=false -trimpath -ldflags "-s -w" -o mcpcheck scripts/mcpcheck.go
 
 clean:
 	rm -f $(BIN) coverage.out coverage.html
