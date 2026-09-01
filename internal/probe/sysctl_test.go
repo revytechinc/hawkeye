@@ -35,6 +35,21 @@ func TestParseSysctlN(t *testing.T) {
 	}
 }
 
+func TestSignedSysctl32_SecurelevelMinusOne(t *testing.T) {
+	if got := probe.SignedSysctl32(4294967295); got != -1 {
+		t.Fatalf("uint32 wrap of -1: got %d", got)
+	}
+	if got := probe.SignedSysctl32(0); got != 0 {
+		t.Fatalf("0: %d", got)
+	}
+	if got := probe.SignedSysctl32(1); got != 1 {
+		t.Fatalf("1: %d", got)
+	}
+	if got := probe.SignedSysctl32(2); got != 2 {
+		t.Fatalf("2: %d", got)
+	}
+}
+
 func TestSysctl8Int_UsesInjectedRunner(t *testing.T) {
 	var got []string
 	v, ok := probe.Sysctl8Int("kern.securelevel", func(argv []string) (string, error) {
