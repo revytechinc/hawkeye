@@ -1379,6 +1379,9 @@ No secrets in fixtures. Apply dry-run default unchanged.
 
 ## 36. Full FreeBSD e2e (QEMU TCG + OVMF) (2026-09-01)
 
+**Preferred on FreeBSD hosts:** `scripts/e2e-freebsd-vm-bhyve.sh` (vm-bhyve +
+bhyve, bridged SSH). The QEMU run below was a Linux cloud-agent fallback.
+
 Guest: FreeBSD 14.3-RELEASE amd64 cloud image under QEMU.
 Host agent is Linux; `/dev/kvm` hits `kvm_spurious_fault`, so accel=tcg.
 UEFI (OVMF) required (image has EFI ESP). Cross-build:
@@ -1387,10 +1390,12 @@ UEFI (OVMF) required (image has EFI ESP). Cross-build:
 CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -o hawkeye ./cmd/hawkeye
 ```
 
-Runner: `scripts/e2e-freebsd.sh` inside the guest (ISO + VV FAT out disk).
-Host helper: `scripts/e2e-freebsd-qemu.sh`.
+Runners:
+- `scripts/e2e-freebsd-vm-bhyve.sh` — **FreeBSD + vm-bhyve** (lab default)
+- `scripts/e2e-freebsd-qemu.sh` — Linux/QEMU fallback
+- `scripts/e2e-freebsd.sh` — guest-side smoke (both paths)
 
-Result: **fail=0** (exit 0). Artifacts:
+Result (QEMU fallback): **fail=0** (exit 0). Artifacts:
 `docs/evidence/freebsd-e2e-2026-09-01/`.
 
 ```
@@ -1414,7 +1419,23 @@ Notes:
 - `doctor` UNHEALTHY without hawkeye-data kit (dependencies FAIL) — expected.
 - Apply stayed dry-run (no `--yes`); JSON showed `"dry_run": true`.
 - `sshd` segfaults under this TCG guest; e2e used serial console + FAT share.
-- Lab jail `hawkeye.revytechinc.com` was unreachable (no SSH key in agent).
+- Lab jail `hawkeye.revytechinc.com` was unreachable (no SSH key in agent);
+  re-run with vm-bhyve there once SSH is wired.
 - `securelevel` is not yet serialized in doctor/inspect JSON; e2e asserts
   via `sysctl(8) kern.securelevel` (T010 input path). Script now logs that
   sysctl line so the NOTE becomes a PASS on the next run.
+
+### vm-bhyve (lab — not run from this Linux agent)
+
+On `hawkeye.revytechinc.com` or any FreeBSD host with vm-bhyve:
+
+```sh
+pkg install vm-bhyve bhyve-firmware uefi-edk2-bhyve go
+sysrc vm_enable=YES vm_dir="zfs:zroot/vm"
+vm init && vm switch create public && vm switch add public em0
+vm img https://download.freebsd.org/ftp/releases/VM-IMAGES/14.3-RELEASE/amd64/Latest/FreeBSD-14.3-RELEASE-amd64-ufs.qcow2.xz
+E2E_SSH_PUB=~/.ssh/id_ed25519.pub sh scripts/e2e-freebsd-vm-bhyve.sh --provision
+sh scripts/e2e-freebsd-vm-bhyve.sh
+```
+
+Evidence lands in `docs/evidence/freebsd-e2e-latest/` by default.

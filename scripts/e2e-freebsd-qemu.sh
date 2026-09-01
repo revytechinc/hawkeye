@@ -1,8 +1,12 @@
 #!/bin/sh
-# Host-side FreeBSD e2e driver (Linux/QEMU). Cross-builds hawkeye for
-# FreeBSD/amd64, boots a FreeBSD cloud image under QEMU (TCG or KVM),
-# runs scripts/e2e-freebsd.sh in the guest, copies the log out via a
-# VV FAT share.
+# Host-side FreeBSD e2e driver (Linux/QEMU fallback only).
+#
+# CloudBSD / FreeBSD hosts should use vm-bhyve instead:
+#   sh scripts/e2e-freebsd-vm-bhyve.sh
+#
+# Cross-builds hawkeye for FreeBSD/amd64, boots a FreeBSD cloud image under
+# QEMU (TCG or KVM), runs scripts/e2e-freebsd.sh in the guest, copies the
+# log out via a VV FAT share.
 #
 # Requires: qemu-system-x86_64, OVMF, genisoimage, a FreeBSD *.qcow2
 # cloud image, and enough RAM (~3G guest).
