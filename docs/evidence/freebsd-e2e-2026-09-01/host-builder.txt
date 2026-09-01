@@ -1,0 +1,5 @@
+Linux cursor 6.12.94+ #1 SMP PREEMPT_DYNAMIC Fri Aug 28 16:08:20 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+guest=FreeBSD 14.3-RELEASE amd64 (QEMU TCG + OVMF)
+binary=GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/hawkeye @ ff542d9
+e2e_exit=0 fail=0
+note=KVM unavailable in this cloud agent (kvm_spurious_fault); used -accel tcg

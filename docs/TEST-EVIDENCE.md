@@ -1376,3 +1376,45 @@ total              ~89.5%+
 `GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/hawkeye` ok.
 Plan `.plan/0300-Hawkeye-Implementation-Tasks.md`: T010 and T011 DONE.
 No secrets in fixtures. Apply dry-run default unchanged.
+
+## 36. Full FreeBSD e2e (QEMU TCG + OVMF) (2026-09-01)
+
+Guest: FreeBSD 14.3-RELEASE amd64 cloud image under QEMU.
+Host agent is Linux; `/dev/kvm` hits `kvm_spurious_fault`, so accel=tcg.
+UEFI (OVMF) required (image has EFI ESP). Cross-build:
+
+```
+CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -o hawkeye ./cmd/hawkeye
+```
+
+Runner: `scripts/e2e-freebsd.sh` inside the guest (ISO + VV FAT out disk).
+Host helper: `scripts/e2e-freebsd-qemu.sh`.
+
+Result: **fail=0** (exit 0). Artifacts:
+`docs/evidence/freebsd-e2e-2026-09-01/`.
+
+```
+PASS: help
+PASS: --check-config (defaults)
+PASS: doctor human exit=1
+PASS: doctor json exit=1
+PASS: inspect
+PASS: inspect --json
+PASS: consult json exit=0
+PASS: plan json exit=0
+PASS: apply default (no --yes) exit=0
+PASS: apply --dry-run
+NOTE: securelevel string not found in log (check probe JSON manually)
+PASS: mcp --stdio initialize (exit=0)
+PASS: sysctl(8) kern.securelevel=-1
+=== summary fail=0 ===
+```
+
+Notes:
+- `doctor` UNHEALTHY without hawkeye-data kit (dependencies FAIL) — expected.
+- Apply stayed dry-run (no `--yes`); JSON showed `"dry_run": true`.
+- `sshd` segfaults under this TCG guest; e2e used serial console + FAT share.
+- Lab jail `hawkeye.revytechinc.com` was unreachable (no SSH key in agent).
+- `securelevel` is not yet serialized in doctor/inspect JSON; e2e asserts
+  via `sysctl(8) kern.securelevel` (T010 input path). Script now logs that
+  sysctl line so the NOTE becomes a PASS on the next run.

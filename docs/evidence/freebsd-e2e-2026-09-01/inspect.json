@@ -1,0 +1,8 @@
+{
+  "findings": [
+    {
+      "area": "fstab",
+      "text": "fstab /boot/efi dump=2 is nonsense; use 0 or 1"
+    }
+  ]
+}
