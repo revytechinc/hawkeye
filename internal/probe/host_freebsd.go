@@ -25,12 +25,16 @@ func cstring(b []byte) string {
 }
 
 func liveSysctlInt(name string) (int, bool) {
-	v, err := unix.SysctlUint32(name)
-	if err == nil {
-		return int(v), true
+	// sysctl(8) -n is signed. Prefer it so kern.securelevel=-1 is not
+	// reported as unix.SysctlUint32's 4294967295.
+	if v, ok := liveSysctl8Int(name); ok {
+		return v, true
 	}
-	// Jail/rescue: libc sysctl can fail; sysctl(8) in /sbin or /rescue is the overlay.
-	return liveSysctl8Int(name)
+	v, err := unix.SysctlUint32(name)
+	if err != nil {
+		return 0, false
+	}
+	return SignedSysctl32(v), true
 }
 
 func liveMountTable() (string, error) {

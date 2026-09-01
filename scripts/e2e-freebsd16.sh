@@ -41,6 +41,11 @@ echo "$doc" | grep -q 'kern.securelevel=' || {
 	echo "e2e: doctor securelevel missing numeric value" >&2
 	exit 1
 }
+# Documented values are -1..3. unix.SysctlUint32 of -1 is 4294967295.
+echo "$doc" | grep -Eq 'kern.securelevel=-?[0-3] \(sysctl' || {
+	echo "e2e: kern.securelevel must be a signed -1..3, not a uint32 wrap" >&2
+	exit 1
+}
 echo "e2e: doctor reports securelevel"
 
 cons="$("$HAWKEYE" consult --json "$QUERY")"

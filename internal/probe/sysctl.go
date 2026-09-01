@@ -29,6 +29,12 @@ func ParseSysctlN(out string) (int, bool) {
 	return n, true
 }
 
+// SignedSysctl32 interprets a 32-bit sysctl as signed. kern.securelevel is
+// -1 in the insecure default; unix.SysctlUint32 reports that as 4294967295.
+func SignedSysctl32(u uint32) int {
+	return int(int32(u))
+}
+
 func safeMIB(name string) bool {
 	if name == "" {
 		return false
