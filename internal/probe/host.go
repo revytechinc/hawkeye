@@ -29,7 +29,7 @@ func Live() DefaultHost {
 		Stat:       os.Stat,
 		Glob:       filepath.Glob,
 		MountTable: liveMountTable,
-		Sysctl:     liveSysctlInt,
+		// Sysctl left nil so SysctlInt prefers sysctl(8) then native.
 	}
 }
 
@@ -47,6 +47,10 @@ func (h DefaultHost) read(path string) string {
 func (h DefaultHost) SysctlInt(name string) (int, bool) {
 	if h.Sysctl != nil {
 		return h.Sysctl(name)
+	}
+	// Prefer sysctl(8) host overlay (T010), then native syscall/libc.
+	if v, ok := Sysctl8Int(name); ok {
+		return v, true
 	}
 	return liveSysctlInt(name)
 }

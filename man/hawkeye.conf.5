@@ -188,6 +188,13 @@ Name of the environment variable that holds the API key.
 Default
 .Ev HAWKEYE_LLM_API_KEY .
 The key itself is never stored in JSON.
+When
+.Va llm.local.model_path
+is empty and the probe tier is 2 or higher, consult may use this OpenAI-compatible
+remote Completer
+.Pq Grok / FreeGrok / Claude gateways
+.Ns .
+Prompts are redacted before the HTTPS call.
 .It Va update.source
 Path to a hawkeye-data
 .Pa knowledge.sqlite

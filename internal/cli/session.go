@@ -111,21 +111,35 @@ func runConsultQuery(env Env, fs flagset, cfg config.Config, q string, in *bufio
 	if st != nil {
 		defer st.Close()
 	}
-	var comp llm.Completer
-	if snap.Tier >= 1 && cfg.LLM.Local.Backend != "" {
-		hr := headroom.Live(snap.GPUPresent)
-		comp = llm.Local{
-			Backend:    cfg.LLM.Local.Backend,
-			Bin:        cfg.LLM.Local.Bin,
-			ModelPath:  cfg.LLM.Local.ModelPath,
-			PreferGPU:  cfg.LLM.Local.PreferGPU,
-			RequireGPU: cfg.LLM.Local.RequireGPU,
-			GPUPresent: snap.GPUPresent,
-			Headroom:   hr,
-			RAMMin:     cfg.Resources.RAMMinFreeBytes,
-			VRAMMin:    cfg.Resources.GPUVRAMMinFreeBytes,
-		}
+	hr := headroom.Live(snap.GPUPresent)
+	remoteKey := ""
+	if envName := strings.TrimSpace(cfg.LLM.Remote.APIKeyEnv); envName != "" {
+		remoteKey = strings.TrimSpace(env.Getenv(envName))
 	}
+	local := llm.Local{
+		Backend:    cfg.LLM.Local.Backend,
+		Bin:        cfg.LLM.Local.Bin,
+		ModelPath:  cfg.LLM.Local.ModelPath,
+		PreferGPU:  cfg.LLM.Local.PreferGPU,
+		RequireGPU: cfg.LLM.Local.RequireGPU,
+		GPUPresent: snap.GPUPresent,
+		Headroom:   hr,
+		RAMMin:     cfg.Resources.RAMMinFreeBytes,
+		VRAMMin:    cfg.Resources.GPUVRAMMinFreeBytes,
+	}
+	comp := llm.SelectCompleter(llm.SelectOpts{
+		Tier:           snap.Tier,
+		LocalBackend:   cfg.LLM.Local.Backend,
+		LocalBin:       cfg.LLM.Local.Bin,
+		LocalModelPath: cfg.LLM.Local.ModelPath,
+		PreferGPU:      cfg.LLM.Local.PreferGPU,
+		RequireGPU:     cfg.LLM.Local.RequireGPU,
+		GPUPresent:     snap.GPUPresent,
+		RemoteProvider: cfg.LLM.Remote.Provider,
+		RemoteEndpoint: cfg.LLM.Remote.Endpoint,
+		RemoteAPIKey:   remoteKey,
+		Local:          local,
+	})
 	res, err := consult.Run(q, snap, st, comp)
 	if err != nil {
 		fmt.Fprintln(env.Stderr, err)

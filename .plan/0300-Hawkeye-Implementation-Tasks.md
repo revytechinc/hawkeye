@@ -2,7 +2,7 @@
 
 **Document ID:** HAWKEYE-0300
 **Version:** 0.1.0
-**Last Updated:** 2026-08-31
+**Last Updated:** 2026-09-01
 **Status:** ACTIVE
 
 | ID | Task | Status | Owner | Notes |
@@ -16,8 +16,8 @@
 | T007 | MCP stdio + HTTP/TLS loopback | DONE | skeleton | |
 | T008 | rc.d + man + ports | DONE | skeleton | |
 | T009 | llama.cpp real backend | DONE | cursor/core-llm-update-rescue-d1e7 | llama-cli/llama.cpp exec; env HAWKEYE_LLM_MODEL/BIN |
-| T010 | Real sysctl(8) securelevel | OPEN | | Host overlay |
-| T011 | Streamable HTTP SSE full spec | OPEN | | POST JSON skeleton |
+| T010 | Real sysctl(8) securelevel | DONE | cursor/t010-t011-remote-llm-ce69 | sysctl(8) host overlay then native; SecurelevelOK |
+| T011 | Streamable HTTP SSE full spec | DONE | cursor/t010-t011-remote-llm-ce69 | POST SSE on Accept event-stream; notifications 202; GET message+endpoint |
 | T012 | hawkeye-data artifact fetch | DONE | cursor/core-llm-update-rescue-d1e7 | skip when HAWKEYE_UPDATE_SOURCE unset; dest defaults |
 | T013 | Consult/plan human TTY (JSON behind --json) | DONE | cursor-consult-human-tty-3358 | operator prose default |
 | T014 | Consult TTY: lead actionable playbook + also | DONE | cursor-consult-tty-lead-3358 | omit query/tier/llm skipped |
