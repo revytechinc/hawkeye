@@ -21,6 +21,8 @@ mode `0600`). Missing or wrong token returns HTTP 401. Do not put a token in
 this README, man pages, or JSON config — JSON names the env var only.
 stdio MCP is for local use and does not require a token.
 nginx terminates TLS; Hawkeye still validates the bearer token.
+GET is SSE after auth. POST is JSON-RPC; if `Accept` includes
+`text/event-stream`, the response is an SSE `event: message` frame.
 Apply/consult through MCP use the same dry-run / `--yes` gate; the LLM never
 execs as root.
 

@@ -1394,3 +1394,31 @@ present on `hawkeye.8` (Dd Dt NAME SYNOPSIS DESCRIPTION COMMANDS OPTIONS
 SIGNALS FILES SEE ALSO; doctor `kern.securelevel` via `sysctl(8)`).
 `hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO.
 No hawkeye-www. No GGUF vendored. LLM never execs as root.
+
+## 31. Streamable HTTP POST SSE (2026-09-01)
+
+T011: MCP Streamable HTTP POST was JSON-only (GET already SSE). Spec
+clients send `Accept: application/json, text/event-stream`. POST now
+returns `event: message` with the JSON-RPC object when Accept includes
+`text/event-stream`. JSON-only Accept stays JSON. Auth is still required
+before any SSE frame. Apply dry-run default unchanged.
+
+Red (`WantsSSE` missing; POST ignored Accept):
+
+```
+internal/mcp/sse_test.go:88:10: undefined: mcp.WantsSSE
+--- FAIL: TestServeHTTP_POST_SSEWhenAcceptEventStream
+    POST with Accept event-stream must be SSE, got "application/json"
+```
+
+Green: `go test ./internal/mcp ./internal/cli ./cmd/hawkeye -count=1` PASS.
+
+`WantsSSE` 100%. Apply `ResolveMode` still 100%. Tests use FAKE token
+fixtures only.
+
+`--check-config` on `configs/config.example.json`: exit 0.
+`hawkeye apply` without `--yes`: `"dry_run": true`.
+`CGO_ENABLED=0 go build -buildvcs=false ./cmd/hawkeye` succeeded.
+
+`mandoc` not installed here. Equivalent mdoc lint: `hawkeye(8)` documents
+POST SSE when Accept includes `text/event-stream`.
