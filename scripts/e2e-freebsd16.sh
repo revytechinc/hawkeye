@@ -79,20 +79,44 @@ echo "$apply" | grep -q '"dry_run": true\|"dry_run":true' || {
 echo "e2e: apply --dry-run ok"
 
 # T011: Streamable HTTP POST SSE. FAKE token only. Loopback. No --yes.
-if command -v python3 >/dev/null 2>&1; then
-	mcp_token="FAKESECRET_a3b4c5d6e7f8g9h0i1j2"
-	export HAWKEYE_MCP_TOKEN="$mcp_token"
-	"$HAWKEYE" mcp --http >/tmp/hawkeye-e2e-mcp.out 2>&1 &
-	mcp_pid=$!
-	trap 'rm -f "$tmp"; kill "$mcp_pid" 2>/dev/null || true' EXIT
-	i=0
-	while [ "$i" -lt 50 ]; do
+# python3 is optional; scripts/mcpcheck.go covers stock FreeBSD images.
+mcpcheck="${HAWKEYE_MCPCHECK:-}"
+if [ -z "$mcpcheck" ]; then
+	_dir=$(dirname "$HAWKEYE")
+	if [ -x "$_dir/mcpcheck" ]; then
+		mcpcheck="$_dir/mcpcheck"
+	elif [ -x ./mcpcheck ]; then
+		mcpcheck=./mcpcheck
+	fi
+fi
+mcp_token="FAKESECRET_a3b4c5d6e7f8g9h0i1j2"
+export HAWKEYE_MCP_TOKEN="$mcp_token"
+"$HAWKEYE" mcp --http >/tmp/hawkeye-e2e-mcp.out 2>&1 &
+mcp_pid=$!
+trap 'rm -f "$tmp"; kill "$mcp_pid" 2>/dev/null || true' EXIT
+i=0
+while [ "$i" -lt 50 ]; do
+	if command -v python3 >/dev/null 2>&1; then
 		if python3 -c 'import socket; s=socket.socket(); s.settimeout(0.2); s.connect(("127.0.0.1",8741)); s.close()' 2>/dev/null; then
 			break
 		fi
-		i=$((i + 1))
+	else
 		sleep 0.1
-	done
+		# give the listener a moment; mcpcheck fails fast if down
+		if [ "$i" -ge 8 ]; then
+			break
+		fi
+	fi
+	i=$((i + 1))
+	sleep 0.1
+done
+if [ -n "$mcpcheck" ]; then
+	"$mcpcheck" || {
+		echo "e2e: MCP POST SSE (mcpcheck) failed" >&2
+		cat /tmp/hawkeye-e2e-mcp.out >&2 || true
+		exit 1
+	}
+elif command -v python3 >/dev/null 2>&1; then
 	sse="$(HAWKEYE_MCP_TOKEN="$mcp_token" python3 - <<'PY'
 import json, os, urllib.error, urllib.request
 token = os.environ["HAWKEYE_MCP_TOKEN"]
@@ -154,12 +178,12 @@ PY
 		echo "e2e: 401 must not be SSE" >&2
 		exit 1
 	}
-	kill "$mcp_pid" 2>/dev/null || true
-	wait "$mcp_pid" 2>/dev/null || true
-	echo "e2e: MCP POST SSE ok"
 else
-	echo "e2e: python3 missing; MCP SSE not exercised" >&2
+	echo "e2e: need python3 or mcpcheck (go build -o mcpcheck scripts/mcpcheck.go)" >&2
 	exit 1
 fi
+kill "$mcp_pid" 2>/dev/null || true
+wait "$mcp_pid" 2>/dev/null || true
+echo "e2e: MCP POST SSE ok"
 
 echo "e2e: PASS"
