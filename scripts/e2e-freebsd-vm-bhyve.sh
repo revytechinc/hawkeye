@@ -7,7 +7,7 @@
 #   vm init && vm switch create public && vm switch add public <iface>
 #
 # One-time guest (example — adjust pool/switch to your host):
-#   vm img https://download.freebsd.org/ftp/releases/VM-IMAGES/14.3-RELEASE/amd64/Latest/FreeBSD-14.3-RELEASE-amd64-ufs.qcow2.xz
+#   vm img https://download.freebsd.org/ftp/snapshots/VM-IMAGES/16.0-CURRENT/amd64/Latest/FreeBSD-16.0-CURRENT-amd64-BASIC-CLOUDINIT-ufs.qcow2.xz
 #   E2E_SSH_PUB=/root/.ssh/id_ed25519.pub sh scripts/e2e-freebsd-vm-bhyve.sh --provision
 #
 # Routine run (guest already exists, SSH key authorized):
