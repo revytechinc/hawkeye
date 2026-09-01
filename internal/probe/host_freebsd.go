@@ -25,6 +25,7 @@ func cstring(b []byte) string {
 }
 
 func liveSysctlInt(name string) (int, bool) {
+	// Native fallback when sysctl(8) is missing (tiny rescue images).
 	v, err := unix.SysctlUint32(name)
 	if err != nil {
 		return 0, false

@@ -331,7 +331,23 @@ nginx terminates TLS and reverse-proxies
 to the loopback listener.
 Public URL:
 .Lk https://hawkeye.revytechinc.com/mcp .
-GET is Server-Sent Events after authentication; POST is JSON-RPC.
+GET opens an authenticated SSE stream
+.Pq event: endpoint
+and
+.Pq event: message
+ready notification
+.Ns .
+POST returns JSON by default; when
+.Sy Accept
+includes
+.Sy text/event-stream ,
+POST returns an SSE
+.Pq event: message
+framing the JSON-RPC response
+.Ns .
+JSON-RPC notifications
+.Pq no id
+return HTTP 202 with an empty body.
 Missing or wrong token returns HTTP 401.
 The token is never written to logs or documentation.
 MCP tools use the same plan/apply gate as the operator CLI:

@@ -18,6 +18,8 @@ import (
 	"github.com/revytechinc/hawkeye/internal/redact"
 )
 
+// fmt used by writeSSEMessage
+
 const DefaultTokenEnv = "HAWKEYE_MCP_TOKEN"
 const TokenFileEnv = "HAWKEYE_MCP_TOKEN_FILE"
 
@@ -212,6 +214,33 @@ func (s *Server) authorized(r *http.Request) bool {
 	return tokenOK(bearerToken(r), s.Token)
 }
 
+func wantsSSE(accept string) bool {
+	return strings.Contains(strings.ToLower(accept), "text/event-stream")
+}
+
+func isNotification(req Request) bool {
+	if req.ID != nil {
+		return false
+	}
+	m := strings.ToLower(strings.TrimSpace(req.Method))
+	return strings.HasPrefix(m, "notifications/") || m == "initialized"
+}
+
+func writeSSEMessage(w http.ResponseWriter, event string, payload any) error {
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if event == "" {
+		event = "message"
+	}
+	_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, b)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	return err
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !s.authorized(r) {
 		unauthorized(w)
@@ -224,9 +253,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
+		// JSON-RPC notifications: 202 Accepted, empty body (Streamable HTTP).
+		if isNotification(req) {
+			_ = s.Handle(req)
+			w.Header().Set("MCP-Protocol-Version", "2025-03-26")
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
 		resp := s.Handle(req)
-		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("MCP-Protocol-Version", "2025-03-26")
+		if wantsSSE(r.Header.Get("Accept")) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache, no-store")
+			w.Header().Set("Connection", "keep-alive")
+			w.WriteHeader(http.StatusOK)
+			_ = writeSSEMessage(w, "message", resp)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	case http.MethodGet, http.MethodHead:
 		// Streamable HTTP GET after auth opens an SSE stream (spec 2025-03-26).
@@ -238,6 +282,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodHead {
 			_, _ = io.WriteString(w, ": hawkeye mcp\n\n")
 			_, _ = io.WriteString(w, "event: endpoint\ndata: /mcp\n\n")
+			_, _ = io.WriteString(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/message\",\"params\":{\"level\":\"info\",\"data\":\"ready\"}}\n\n")
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}

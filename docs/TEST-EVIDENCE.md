@@ -1341,3 +1341,38 @@ SIGNALS FILES SEE ALSO; llama-embedding query-time rank).
 `hawkeye.conf.5` has NAME DESCRIPTION KEYS ENVIRONMENT SEE ALSO;
 `llm.local.bin` is the completer only. No hawkeye-www. No GGUF vendored.
 Consult stays read-only. LLM never execs as root.
+
+## 35. T010 sysctl(8) securelevel + T011 Streamable SSE + remote LLM (2026-09-01)
+
+Red → green for:
+
+- `internal/probe`: `ParseSysctl8Output`, `Sysctl8Int` via injectable
+  `Sysctl8Run`, `Live().SysctlInt("kern.securelevel")` prefers sysctl(8)
+  then native `unix.SysctlUint32` on FreeBSD.
+- `internal/mcp`: POST with `Accept: text/event-stream` returns
+  `event: message` SSE; JSON Accept stays `application/json`;
+  notifications (no id) return HTTP 202; GET SSE includes endpoint + message.
+- `internal/llm`: OpenAI-compatible `Remote` Completer (redact prompt,
+  Bearer from env, no key in errors); `SelectCompleter` prefers local GGUF
+  then tier≥2 remote. CLI consult wires `SelectCompleter`.
+
+```
+$ go test ./... -count=1
+ok  	github.com/revytechinc/hawkeye/cmd/hawkeye
+ok  	github.com/revytechinc/hawkeye/internal/...
+```
+
+Coverage sample (package statements):
+
+```
+internal/mcp       85.1%
+internal/llm       93.0%
+internal/probe     87.5%
+internal/redact   100.0%
+total              ~89.5%+
+```
+
+`--check-config` (defaults): exit 0.
+`GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/hawkeye` ok.
+Plan `.plan/0300-Hawkeye-Implementation-Tasks.md`: T010 and T011 DONE.
+No secrets in fixtures. Apply dry-run default unchanged.
