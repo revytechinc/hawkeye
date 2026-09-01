@@ -1,5 +1,8 @@
-Linux cursor 6.12.94+ #1 SMP PREEMPT_DYNAMIC Fri Aug 28 16:08:20 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
-guest=FreeBSD 14.3-RELEASE amd64 (QEMU TCG + OVMF)
-binary=GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/hawkeye @ ff542d9
+Linux cursor 6.12.94+ x86_64 (QEMU TCG fallback builder)
+guest=FreeBSD 16.0-CURRENT amd64 (QEMU TCG + OVMF, -cpu qemu64)
+guest_version=16.0-CURRENT #0 main-n288738-9bec8a959bd6 Mon Aug 31 13:10:15 UTC 2026
+binary=GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/hawkeye @ 69e9747
 e2e_exit=0 fail=0
-note=KVM unavailable in this cloud agent (kvm_spurious_fault); used -accel tcg
+note=Product lab hawkeye.revytechinc.com runs FreeBSD 16-CURRENT; vm-bhyve is preferred on that host
+note_qemu=Use E2E_CPU=qemu64 under tcg; -cpu max triggers ZFS AVX2 panic on 16-CURRENT
+supersedes=hawkeye-e2e-14.3.log (wrong target release for lab)
