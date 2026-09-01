@@ -1,0 +1,44 @@
+{
+  "healthy": false,
+  "checks": [
+    {
+      "name": "config",
+      "ok": true,
+      "detail": "configuration is valid"
+    },
+    {
+      "name": "permissions",
+      "ok": true,
+      "detail": "config permissions acceptable"
+    },
+    {
+      "name": "pidfile",
+      "ok": true,
+      "detail": "service is not running; pidfile not required"
+    },
+    {
+      "name": "dependencies",
+      "ok": false,
+      "detail": "knowledge store missing"
+    },
+    {
+      "name": "headroom",
+      "ok": true,
+      "detail": "gpu absent (ok; not required for this operation)"
+    },
+    {
+      "name": "local_llm",
+      "ok": true,
+      "detail": "optional local GGUF missing (consult skips quietly)"
+    }
+  ],
+  "resources": {
+    "ram_free_bytes": 2944278528,
+    "ram_total_bytes": 3096711168,
+    "cpu_pct": 0,
+    "disk_free_bytes": 995246080,
+    "gpu_present": false,
+    "gpu_vram_free_bytes": null
+  },
+  "tier": 2
+}

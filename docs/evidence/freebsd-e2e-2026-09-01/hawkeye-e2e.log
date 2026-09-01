@@ -1,0 +1,209 @@
+=== Hawkeye FreeBSD e2e 2026-09-01T04:35:12Z ===
+host=FreeBSD 14.3-RELEASE amd64
+bin=/tmp/hawkeye
+PASS: help
+configuration ok: defaults (no file at /usr/local/etc/cloudbsd/hawkeye/config.json)
+PASS: --check-config (defaults)
+hawkeye doctor: UNHEALTHY
+tier: 2
+  config         ok  configuration is valid
+  permissions    ok  config permissions acceptable
+  pidfile        ok  service is not running; pidfile not required
+  dependencies   FAIL  knowledge store missing
+  headroom       ok  gpu absent (ok; not required for this operation)
+  local_llm      ok  optional local GGUF missing (consult skips quietly)
+resources: ram_free=2943909888 disk_free=995246080 gpu=false
+
+{
+  "healthy": false,
+  "checks": [
+    {
+      "name": "config",
+      "ok": true,
+      "detail": "configuration is valid"
+    },
+    {
+      "name": "permissions",
+      "ok": true,
+      "detail": "config permissions acceptable"
+    },
+    {
+      "name": "pidfile",
+      "ok": true,
+      "detail": "service is not running; pidfile not required"
+    },
+    {
+      "name": "dependencies",
+      "ok": false,
+      "detail": "knowledge store missing"
+    },
+    {
+      "name": "headroom",
+      "ok": true,
+      "detail": "gpu absent (ok; not required for this operation)"
+    },
+    {
+      "name": "local_llm",
+      "ok": true,
+      "detail": "optional local GGUF missing (consult skips quietly)"
+    }
+  ],
+  "resources": {
+    "ram_free_bytes": 2943909888,
+    "ram_total_bytes": 3096711168,
+    "cpu_pct": 0,
+    "disk_free_bytes": 995246080,
+    "gpu_present": false,
+    "gpu_vram_free_bytes": null
+  },
+  "tier": 2
+}
+{
+  "healthy": false,
+  "checks": [
+    {
+      "name": "config",
+      "ok": true,
+      "detail": "configuration is valid"
+    },
+    {
+      "name": "permissions",
+      "ok": true,
+      "detail": "config permissions acceptable"
+    },
+    {
+      "name": "pidfile",
+      "ok": true,
+      "detail": "service is not running; pidfile not required"
+    },
+    {
+      "name": "dependencies",
+      "ok": false,
+      "detail": "knowledge store missing"
+    },
+    {
+      "name": "headroom",
+      "ok": true,
+      "detail": "gpu absent (ok; not required for this operation)"
+    },
+    {
+      "name": "local_llm",
+      "ok": true,
+      "detail": "optional local GGUF missing (consult skips quietly)"
+    }
+  ],
+  "resources": {
+    "ram_free_bytes": 2944036864,
+    "ram_total_bytes": 3096711168,
+    "cpu_pct": 0,
+    "disk_free_bytes": 995246080,
+    "gpu_present": false,
+    "gpu_vram_free_bytes": null
+  },
+  "tier": 2
+}
+{
+  "healthy": false,
+  "checks": [
+    {
+      "name": "config",
+      "ok": true,
+      "detail": "configuration is valid"
+    },
+    {
+      "name": "permissions",
+      "ok": true,
+      "detail": "config permissions acceptable"
+    },
+    {
+      "name": "pidfile",
+      "ok": true,
+      "detail": "service is not running; pidfile not required"
+    },
+    {
+      "name": "dependencies",
+      "ok": false,
+      "detail": "knowledge store missing"
+    },
+    {
+      "name": "headroom",
+      "ok": true,
+      "detail": "gpu absent (ok; not required for this operation)"
+    },
+    {
+      "name": "local_llm",
+      "ok": true,
+      "detail": "optional local GGUF missing (consult skips quietly)"
+    }
+  ],
+  "resources": {
+    "ram_free_bytes": 2943975424,
+    "ram_total_bytes": 3096711168,
+    "cpu_pct": 0,
+    "disk_free_bytes": 995246080,
+    "gpu_present": false,
+    "gpu_vram_free_bytes": null
+  },
+  "tier": 2
+}
+PASS: doctor human exit=1
+PASS: doctor json exit=1
+fstab /boot/efi dump=2 is nonsense; use 0 or 1
+{
+  "findings": [
+    {
+      "area": "fstab",
+      "text": "fstab /boot/efi dump=2 is nonsense; use 0 or 1"
+    }
+  ]
+}
+PASS: inspect
+PASS: inspect --json
+{
+  "query": "zpool degraded",
+  "tier": 2,
+  "hits": null,
+  "notes": [
+    "knowledge store unavailable; FTS skipped",
+    "llm skipped: local llm model is not configured"
+  ]
+}
+PASS: consult json exit=0
+{
+  "id": "consult-plan",
+  "source": "knowledge",
+  "summary": "restart sshd",
+  "steps": []
+}
+PASS: plan json exit=0
+{
+  "dry_run": true,
+  "applied": false,
+  "steps": [
+    {
+      "id": "1",
+      "skipped": true,
+      "dry_run": true,
+      "output": "dry-run: true"
+    }
+  ]
+}
+{
+  "dry_run": true,
+  "applied": false,
+  "steps": [
+    {
+      "id": "1",
+      "skipped": true,
+      "dry_run": true,
+      "output": "dry-run: true"
+    }
+  ]
+}
+PASS: apply default (no --yes) exit=0
+PASS: apply --dry-run
+NOTE: securelevel string not found in log (check probe JSON manually)
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}},"protocolVersion":"2025-03-26","serverInfo":{"name":"hawkeye","version":"0.1.0"}}}
+PASS: mcp --stdio initialize (exit=0)
+PASS: sysctl(8) kern.securelevel=-1
+=== summary fail=0 log=/mnt/out/hawkeye-e2e.log ===
